@@ -1,0 +1,34 @@
+{
+   "categories":{
+        "1":{
+            "types":{
+                "t1":{
+                    "properties":{
+
+                    }
+                },
+                "t2":{
+                    "properties":{
+
+                    }
+                }
+            }
+        },
+        "2":{
+            "types":{
+                "e1":{
+                    "properties":{
+
+                    }
+                },
+                "e2":{
+                    "properties":{
+
+                    }
+                }
+            }
+        },
+
+   }
+
+}
