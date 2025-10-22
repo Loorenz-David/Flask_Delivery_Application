@@ -1,4 +1,4 @@
-# Beyo Delivery Backend
+# Flask_Delivery_Application
 
 Backend-for-the-delivery application currently focuses on authentication and item catalogue management. It is built with Flask and SQLAlchemy, targets PostgreSQL in production, and falls back to an in-memory SQLite database for the automated test-suite.
 
@@ -150,4 +150,4 @@ The current tests cover the item creation routes (`tests/test_item_routers/test_
 - Marshmallow schemas (`models/schemas/items_schema.py`) predate the latest relationship changes and will likely be refined as the API evolves.
 - Consider adding a `requirements.txt`/`poetry.lock` and database migrations as the project matures.
 
-With this setup you can spin up the API, seed catalogue data via the provided endpoints, query it, and verify behaviour with the pytest suite. Happy shipping!
+With this setup you can spin up the API, seed catalogue data via the provided endpoints, query it, and verify behaviour with the pytest suite. 
