@@ -1,7 +1,7 @@
 from sqlalchemy.inspection import inspect
 from sqlalchemy import Column
 from sqlalchemy.orm.attributes import InstrumentedAttribute
-from datetime import datetime
+from datetime import datetime, timezone
 
 from typing import Any, Union
 from sqlalchemy.orm.exc import UnmappedInstanceError
@@ -68,7 +68,7 @@ class ValueValidator:
         if isinstance(value, str) and column_type is datetime:
             try:
                 # Handles both Python and JS ISO formats
-                return datetime.fromisoformat(value.replace("Z", "+00:00"))
+                return datetime.fromisoformat(value).replace(tzinfo=timezone.utc)
             except ValueError as e:
                 raise e
 
@@ -80,3 +80,35 @@ class ValueValidator:
         
 
         raise Exception(f"the type '{type(value)}' is not supported by column, it must be '{column_type}'")
+
+class DataStructureValidators:
+
+    @staticmethod
+    def is_list_of_dicts(data):
+        if not isinstance(data,list):
+            if isinstance(data,dict):
+                data = [data]
+            else:
+                raise ValueError(f"Data must be in list or dictionary format, instade got: {type(data)}")
+        else:
+            if len(data) > 0 and not isinstance(data[0],dict):
+                raise ValueError(f"Data inside the list of dictionary format, instade got: {type(data)}")
+        
+        return data
+    
+    @staticmethod
+    def is_valid_update_dict(data:dict, reference,action_type="modify"):
+        print("dat in is_valid_dict", data)
+        has_id = data.get('id',None)
+        has_fields = data.get('fields',None)
+
+        if has_id is None:
+            raise ValueError(f"Data is missing an id to find the {reference}")
+        
+        if has_fields is None:
+            raise ValueError(f"Data is missing fields to {action_type} {reference}")
+        
+        if not isinstance(has_fields,dict):
+            raise ValueError(f"Fields must be of type dict, to {action_type} {reference}")
+
+        return True

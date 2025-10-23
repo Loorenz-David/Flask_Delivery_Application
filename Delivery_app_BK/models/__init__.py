@@ -13,5 +13,7 @@ from .tables.items_models import Item
 from .tables.items_models import ItemType
 from .tables.items_models import ItemCategory
 from .tables.items_models import ItemProperty
+from .tables.items_models import ItemState
+from .tables.items_models import ItemPosition
 from .tables.deliveries_models import Order
 from .tables.deliveries_models import Route

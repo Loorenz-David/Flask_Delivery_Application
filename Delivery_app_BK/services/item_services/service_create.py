@@ -1,6 +1,15 @@
 
 # Local Imports
-from Delivery_app_BK.models import db, Item, Order, ItemType, ItemCategory, ItemProperty
+from Delivery_app_BK.models import (
+    db,
+    Item,
+    Order,
+    ItemType,
+    ItemCategory,
+    ItemProperty,
+    ItemState,
+    ItemPosition,
+)
 from Delivery_app_BK.services import create_general_object
 
 
@@ -35,12 +44,23 @@ def service_create_item_property(fields:dict) -> dict:
 
     return create_general_object(fields, ItemProperty,rel_map)
 
+# CREATE ItemState Instance
+def service_create_item_state(fields: dict) -> dict:
+    return create_general_object(fields, ItemState)
+
+
+# CREATE ItemPosition Instance
+def service_create_item_position(fields: dict) -> dict:
+    return create_general_object(fields, ItemPosition)
+
 # CREATE Item Instance
 def service_create_item(fields:dict) -> dict:
     rel_map = {
         'order_id':Order,
         'item_type_id':ItemType,
         'item_category_id':ItemCategory,
+        'item_state_id':ItemState,
+        'item_position_id':ItemPosition,
         'properties':ItemProperty
     }
 

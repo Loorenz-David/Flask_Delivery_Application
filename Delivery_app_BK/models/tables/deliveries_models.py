@@ -21,15 +21,17 @@ class Order(db.Model, ObjectObtainer):
     client_name = Column(String, nullable=False)
     client_phones = Column(String)
     client_address = Column(JSONB().with_variant(JSON, "sqlite"))  # dict: { street_address, postal_code, building_floor, coordinates }
+    client_language = Column(String,nullable=True)
 
     notes_chat = Column(JSONB().with_variant(JSON, "sqlite"))  # list
 
     expected_arrival_time = Column(String)
     actual_arrival_time = Column(String)
 
-    upon_purchase_message = Column(Boolean, default=False)
-    expected_arrival_time_message = Column(Boolean, default=False)
-    upon_completion_message = Column(Boolean, default=False)
+    # upon_purchase_message = Column(Boolean, default=False)
+    # expected_arrival_time_message = Column(Boolean, default=False)
+    # upon_completion_message = Column(Boolean, default=False)
+    
     marketing_messages = Column(Boolean, default=False)
 
     creation_date = Column(DateTime(timezone=True),default=lambda: datetime.now(timezone.utc))
@@ -48,8 +50,7 @@ class Order(db.Model, ObjectObtainer):
     )
     
     
-    def __repr__(self):
-        return f"<Order {self.client_name}>"
+    
     
 
 # model definition for a route
@@ -81,5 +82,4 @@ class Route(db.Model, ObjectObtainer):
     )
    
 
-    def __repr__(self):
-        return f"<Route {self.label}>"
+   

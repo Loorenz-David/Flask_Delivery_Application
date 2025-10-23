@@ -7,6 +7,7 @@ from Delivery_app_BK.models import db
 # Local application imports
 
 from Delivery_app_BK.models.managers.object_obtainer import ObjectObtainer
+from Delivery_app_BK.models.managers.object_updator import ObjectUpdator
 
 type_property_association = db.Table(
     "type_property_association",
@@ -21,7 +22,7 @@ item_property_association = db.Table(
 )
 
 
-class Item(db.Model, ObjectObtainer):
+class Item(db.Model, ObjectObtainer, ObjectUpdator):
     __tablename__ = "Item"
 
     id = Column(Integer, primary_key=True)
@@ -30,7 +31,10 @@ class Item(db.Model, ObjectObtainer):
     # Foreign key links
     item_type_id = Column(Integer, ForeignKey("ItemType.id"))
     item_category_id = Column(Integer, ForeignKey("ItemCategory.id"))
-    
+    item_state_id = Column(Integer, ForeignKey("ItemState.id"))
+    item_position_id = Column(Integer, ForeignKey("ItemPosition.id"))
+    order_id = Column(Integer, ForeignKey("Order.id"))
+
     # Access through relationship links
     item_type = relationship(
         "ItemType", 
@@ -38,6 +42,14 @@ class Item(db.Model, ObjectObtainer):
     )
     item_category = relationship(
         "ItemCategory", 
+        backref="items"
+    )
+    item_state = relationship(
+        "ItemState", 
+        backref="items"
+    )
+    item_position = relationship(
+        "ItemPosition", 
         backref="items"
     )
     properties = db.relationship(
@@ -52,14 +64,12 @@ class Item(db.Model, ObjectObtainer):
     item_valuation = Column(Integer)
     dimensions = Column(JSONB().with_variant(JSON, "sqlite"))
 
-    #states and positions come from models!! as the user can add or remove...a
+   
     weight = Column(Integer)
-    position = Column(String)
-    position_record = Column(JSONB().with_variant(JSON, "sqlite"))
-    state = Column(String)
-    state_record = Column(JSONB().with_variant(JSON, "sqlite"))
+    item_position_record = Column(JSONB().with_variant(JSON, "sqlite")) # list of dicts [ { state:label, time: date-time } ]
+    item_state_record = Column(JSONB().with_variant(JSON, "sqlite")) # list of dicts [ { state:label, time: date-time } ]
 
-    order_id = Column(Integer, ForeignKey("Order.id"))
+    
 
     def __repr__(self):
         return f"<Item {self.article_number}>"
@@ -107,3 +117,19 @@ class ItemProperty(db.Model, ObjectObtainer):
         secondary=item_property_association,
         back_populates="properties"
     )
+
+
+
+class ItemState(db.Model,ObjectObtainer):
+    __tablename__ = "ItemState"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+
+
+class ItemPosition(db.Model,ObjectObtainer):
+    __tablename__ = "ItemPosition"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+

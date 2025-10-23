@@ -5,3 +5,12 @@ from Delivery_app_BK.services.item_services.service_create import service_create
 from Delivery_app_BK.services.item_services.service_create import service_create_item_type
 from Delivery_app_BK.services.item_services.service_create import service_create_item_property
 from Delivery_app_BK.services.item_services.service_create import service_create_item
+from Delivery_app_BK.services.item_services.service_create import service_create_item_state
+from Delivery_app_BK.services.item_services.service_create import service_create_item_position
+from Delivery_app_BK.services.order_services.service_create import service_create_order
+from Delivery_app_BK.services.routes_services.service_create import service_create_route
+
+
+from Delivery_app_BK.services.item_services.service_update import service_update_item
+from Delivery_app_BK.services.routes_services.service_update import service_update_route
+from Delivery_app_BK.services.order_services.service_update import service_update_order
