@@ -9,13 +9,15 @@ from datetime import datetime, timezone
 from Delivery_app_BK.models import db
 from Delivery_app_BK.models.managers.object_obtainer import ObjectObtainer
 from Delivery_app_BK.models.managers.object_updator import ObjectUpdator
+from Delivery_app_BK.models.mixins.teams_mixings import TeamScopedMixin
+
 
 
 
 
 
 # model definition of an order
-class Order(db.Model, ObjectObtainer, ObjectUpdator):
+class Order(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     __tablename__ = "Order"
 
     id = Column(Integer, primary_key=True)
@@ -47,7 +49,13 @@ class Order(db.Model, ObjectObtainer, ObjectUpdator):
 
     delivery_items = db.relationship(
         "Item", 
-        backref="order", 
+        backref="orders", 
+        lazy=True
+    )
+
+    team = relationship(
+        "Team", 
+        backref="orders", 
         lazy=True
     )
     
@@ -56,14 +64,15 @@ class Order(db.Model, ObjectObtainer, ObjectUpdator):
     
 
 # model definition for a route
-class Route(db.Model, ObjectObtainer, ObjectUpdator):
+class Route(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     __tablename__ = "Route"
 
     id = Column(Integer, primary_key=True)
     route_label = Column(String, nullable=False)
     delivery_date = Column(DateTime(timezone=True),default=lambda: datetime.now(timezone.utc))
 
-    assigned_driver = Column(String)  # Replace with ForeignKey(User.id) 
+    driver_id = Column(Integer,ForeignKey("User.id")) # Replace with ForeignKey(User.id) 
+
 
     expected_start_time = Column(String)
     expected_end_time = Column(String)
@@ -81,20 +90,38 @@ class Route(db.Model, ObjectObtainer, ObjectUpdator):
     # relationships
     delivery_orders = relationship(
         "Order",
-        backref="route",
+        backref="routes",
         order_by="Order.delivery_arrangement",
         cascade="all, delete-orphan"
     )
 
     route_state = relationship(
         "RouteState",
-        backref="route",
+        backref="routes",
+    )
+
+    team = relationship(
+        "Team", 
+        backref="routes", 
+        lazy=True
+    )
+
+     # relationships
+    driver = relationship(
+        "User",
+        backref="routes",
     )
    
 
 
-class RouteState(db.Model,ObjectObtainer, ObjectUpdator):
+class RouteState(db.Model,ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     __tablename__ = "RouteState"
 
     id = Column(Integer, primary_key=True)
     name = Column(String)
+
+    team = relationship(
+        "Team", 
+        backref="route_states", 
+        lazy=True
+    )

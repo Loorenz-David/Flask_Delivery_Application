@@ -8,6 +8,7 @@ from Delivery_app_BK.models import db
 
 from Delivery_app_BK.models.managers.object_obtainer import ObjectObtainer
 from Delivery_app_BK.models.managers.object_updator import ObjectUpdator
+from Delivery_app_BK.models.mixins.teams_mixings import TeamScopedMixin
 
 type_property_association = db.Table(
     "type_property_association",
@@ -22,7 +23,7 @@ item_property_association = db.Table(
 )
 
 
-class Item(db.Model, ObjectObtainer, ObjectUpdator):
+class Item(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     __tablename__ = "Item"
 
     id = Column(Integer, primary_key=True)
@@ -58,6 +59,12 @@ class Item(db.Model, ObjectObtainer, ObjectUpdator):
         back_populates="items"
     )
 
+    team = relationship(
+        "Team", 
+        backref="items", 
+        lazy=True
+    )
+
     # link to an extrnal page...
     page_link = Column(String)
 
@@ -75,7 +82,7 @@ class Item(db.Model, ObjectObtainer, ObjectUpdator):
         return f"<Item {self.article_number}>"
 
 
-class ItemType(db.Model, ObjectObtainer, ObjectUpdator):
+class ItemType(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     __tablename__ = "ItemType"
 
     id = Column(Integer, primary_key=True)
@@ -84,19 +91,30 @@ class ItemType(db.Model, ObjectObtainer, ObjectUpdator):
     properties = db.relationship(
         "ItemProperty",
         secondary=type_property_association,
-        back_populates="types"
+        back_populates="item_types"
+    )
+
+    team = relationship(
+        "Team", 
+        backref="item_types", 
+        lazy=True
     )
 
 
-class ItemCategory(db.Model, ObjectObtainer, ObjectUpdator):
+class ItemCategory(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     __tablename__ = "ItemCategory"
 
     id = Column(Integer, primary_key=True)
     name = Column(String, unique=True, nullable=False)
 
+    team = relationship(
+        "Team", 
+        backref="item_categories", 
+        lazy=True
+    )
 
 
-class ItemProperty(db.Model, ObjectObtainer, ObjectUpdator):
+class ItemProperty(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     __tablename__ = "ItemProperty"
 
     id = Column(Integer, primary_key=True)
@@ -118,17 +136,35 @@ class ItemProperty(db.Model, ObjectObtainer, ObjectUpdator):
         back_populates="properties"
     )
 
+    team = relationship(
+        "Team", 
+        backref="item_properties", 
+        lazy=True
+    )
 
 
-class ItemState(db.Model,ObjectObtainer, ObjectUpdator):
+
+class ItemState(db.Model,ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     __tablename__ = "ItemState"
 
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
 
+    team = relationship(
+        "Team", 
+        backref="items_states", 
+        lazy=True
+    )
 
-class ItemPosition(db.Model,ObjectObtainer, ObjectUpdator):
+
+class ItemPosition(db.Model,ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     __tablename__ = "ItemPosition"
 
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
+
+    team = relationship(
+        "Team", 
+        backref="item_positions", 
+        lazy=True
+    )

@@ -4,6 +4,8 @@ from .auth_routers.token_generation import token_generation_bp
 from .item_routers import item_bp
 from .order_routers import order_bp
 from .route_routers import route_bp
+from .notifications_routers import notifications_bp
+from .user_routers import user_bp
 
 
 # register all existing blueprints and assign url_prefixes
@@ -12,3 +14,5 @@ def register_blueprints( app ):
     app.register_blueprint( item_bp, url_prefix="/item" )
     app.register_blueprint( order_bp, url_prefix="/order" )
     app.register_blueprint( route_bp, url_prefix="/route" )
+    app.register_blueprint( notifications_bp, url_prefix="/notifications" )
+    app.register_blueprint( user_bp, url_prefix="/user" )
