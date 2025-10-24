@@ -1,6 +1,6 @@
 import pytest
 import logging
-from tests.test_item_routers.test_routes_create import test_item, setup_item_dependencies_creation
+from tests.test_item_routers.test_create_items import test_item, setup_item_dependencies_creation
 
 @pytest.fixture
 def dependencies_for_order(client):

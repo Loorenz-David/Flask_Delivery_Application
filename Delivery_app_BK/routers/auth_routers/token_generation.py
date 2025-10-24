@@ -7,7 +7,7 @@ from flask_jwt_extended import create_access_token, create_refresh_token, jwt_re
 
 
 # Local application imports 
-from Delivery_app_BK.models.tables.users_models import User
+from Delivery_app_BK.models import User
 from Delivery_app_BK.models.schemas.users_schema import UserSchema
 from Delivery_app_BK.routers.utils.response import Response
 

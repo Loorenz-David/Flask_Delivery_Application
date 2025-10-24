@@ -5,6 +5,7 @@ from .item_routers import item_bp
 from .order_routers import order_bp
 from .route_routers import route_bp
 
+
 # register all existing blueprints and assign url_prefixes
 def register_blueprints( app ):
     app.register_blueprint( token_generation_bp, url_prefix="/auth" )

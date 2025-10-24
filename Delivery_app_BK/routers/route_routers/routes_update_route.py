@@ -1,6 +1,6 @@
 from flask import request
 
-from Delivery_app_BK.models.managers import ObjectFiller
+from Delivery_app_BK.models.managers.object_filler import ObjectFiller
 from Delivery_app_BK.routers.utils.response import Response
 from Delivery_app_BK.services import service_update_route
 from . import route_bp

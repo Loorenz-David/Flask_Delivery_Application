@@ -63,7 +63,7 @@ class ObjectUpdator:
             column:ColumnInspector,
             value:list
     ):
-        print('updating relationship')
+        
         # gets the table where the relationship is pointing
         target_model = column.relationship.mapper.class_
 
@@ -83,7 +83,7 @@ class ObjectUpdator:
         relationships_to_remove_ids = self.compare_relationship_change(old_ids, new_ids)
         
         # removes the relationships from the difference in O(n)
-        print(relationships_to_remove_ids,'rel list to remove')
+       
         decrease_by = 0
         for old_id in relationships_to_remove_ids:
             target_i = hash_map_old_rel[old_id]
@@ -93,8 +93,7 @@ class ObjectUpdator:
             relationship_list.pop()
             decrease_by += 1
         
-        print('relationship list: ',relationship_list)
-        print('ids to add : ',relationships_to_add_ids)
+     
         # adds the relationships in O(n)
         for id in relationships_to_add_ids:
             obj_lookup = GetObject.get_object(target_model,id)

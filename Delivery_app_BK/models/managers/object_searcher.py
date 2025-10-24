@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Optional, TYPE_CHECKING
 from datetime import date, datetime
 
 from marshmallow import ValidationError
@@ -14,7 +14,9 @@ from flask_sqlalchemy.model import Model
 # Local Imports
 from Delivery_app_BK.models import db
 from Delivery_app_BK.models.managers.object_validators import ActionValidator, InstanceValidator
-from Delivery_app_BK.routers.utils.response import Response
+
+if TYPE_CHECKING:
+    from Delivery_app_BK.routers.utils.response import Response
 
 """
 ObjectSearcher is an object that builds query filters by giving column targets, value targets
@@ -52,10 +54,14 @@ class ObjectSearcher(ActionValidator):
         Obj: Any,
         query_filters: Optional[dict] = None,
         requested_data: Optional[list] = None,
-        response: Optional[Response] = None,
+        response: Optional["Response"] = None,
         data: Optional[dict] = None
     ):
-        self.response: Response = response or Response()
+        if response is None:
+            from Delivery_app_BK.routers.utils.response import Response as ResponseClass
+            self.response = ResponseClass()
+        else:
+            self.response = response
         self.Obj = Obj
         self.query_filters = query_filters or {}
         self.requested_data = requested_data or []
@@ -98,14 +104,16 @@ class ObjectSearcher(ActionValidator):
                 query, target_column, operation, value = self.join_relationship_to_query(query, column, op)
 
             else:
-                op = self.validate_query_operation( operation, column )
+                
+                op = self.validate_query_operation( op, column )
+                
                 operation = op['operation']
                 value = op['value']
 
                 # validates column exist in model
-                column = self.has_column( column, self.Obj )
+                column = self.has_column( column )
                 # validates the value pass is of same type as column type
-                self.value_has_valid_format(column, value, operation)
+                self.value_has_valid_format(column, value)
                 # sets target
                 target_column = getattr(self.Obj, column)
 
@@ -292,7 +300,7 @@ class FindObjects:
 
     @staticmethod
     def find_objects(
-        response:Response,
+        response:"Response",
         Model:Model,
         incoming_data:dict,
         compress_data = True,
@@ -300,7 +308,9 @@ class FindObjects:
     ):
         
         try:
+            
             incoming_data = incoming_data or {}
+            
             order_by = incoming_data.get('order_by', { "column": "id", "direction": "desc" })
             pagination = incoming_data.get('pagination', None)
             query_filters = incoming_data.get('query', {})

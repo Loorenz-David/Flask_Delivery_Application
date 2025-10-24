@@ -71,8 +71,9 @@ def test_query_order_returns_results_with_nested_items(client):
     }
 
     res = client.post("/order/query_order", json=query_payload)
-    assert res.status_code == 200
     body = res.get_json()
+    assert res.status_code == 200
+    
 
     unpacked = decode_response_payload(body)
     assert "items" in unpacked

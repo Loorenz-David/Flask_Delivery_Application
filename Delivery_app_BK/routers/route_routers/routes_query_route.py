@@ -5,7 +5,7 @@ from flask import request
 from . import route_bp
 from Delivery_app_BK.routers.utils.response import Response
 from Delivery_app_BK.models import Route
-from Delivery_app_BK.models.managers import FindObjects
+from Delivery_app_BK.models.managers.object_searcher import FindObjects
 
 @route_bp.route("/query_route",methods=['POST'])
 def query_route ():

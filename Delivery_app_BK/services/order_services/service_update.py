@@ -1,5 +1,7 @@
 from Delivery_app_BK.models import Order,Route,db
-from Delivery_app_BK.models.managers import GetObject, ColumnInspector, ValueValidator, DataStructureValidators
+from Delivery_app_BK.models.managers.object_searcher import GetObject
+from Delivery_app_BK.models.managers.object_inspector import ColumnInspector
+from Delivery_app_BK.models.managers.object_validators import ValueValidator, DataStructureValidators
 
 from Delivery_app_BK.services import service_create_item
 

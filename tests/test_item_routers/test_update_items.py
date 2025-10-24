@@ -1,5 +1,5 @@
 import pytest
-from tests.test_item_routers.test_routes_create import setup_item_dependencies_creation, test_item
+from tests.test_item_routers.test_create_items import setup_item_dependencies_creation, test_item
 
 def test_update_item( client, setup_item_dependencies_creation ):
 

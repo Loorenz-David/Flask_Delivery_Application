@@ -1,5 +1,5 @@
 from sqlalchemy.inspection import inspect
-from . import db
+from Delivery_app_BK.models import db
 from .object_searcher import GetObject
 from .object_inspector import ColumnInspector
 

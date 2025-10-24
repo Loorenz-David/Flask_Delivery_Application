@@ -3,8 +3,6 @@ from typing import List, Dict, Any, Optional, Set
 
 from sqlalchemy.orm.collections import InstrumentedList
 
-from flask_sqlalchemy.model import Model
-from typing import Type
 
 
 class ObjectObtainer:

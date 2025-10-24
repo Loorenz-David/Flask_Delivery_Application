@@ -6,7 +6,8 @@ from Delivery_app_BK.models import db
 
 # Local application imports
 
-from Delivery_app_BK.models.managers import ObjectObtainer, ObjectUpdator
+from Delivery_app_BK.models.managers.object_obtainer import ObjectObtainer
+from Delivery_app_BK.models.managers.object_updator import ObjectUpdator
 
 type_property_association = db.Table(
     "type_property_association",

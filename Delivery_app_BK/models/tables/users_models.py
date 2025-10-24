@@ -7,7 +7,7 @@ from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
 
 # Local application imports
 from Delivery_app_BK.models import db
-from Delivery_app_BK.models.managers import ObjectObtainer
+from Delivery_app_BK.models.managers.object_obtainer import ObjectObtainer
 
 class User(db.Model, ObjectObtainer):
     __tablename__ = "User"

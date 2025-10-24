@@ -1,13 +1,15 @@
-from typing import Any, Union, Callable
+from typing import Any, Union, Callable, TYPE_CHECKING
 import traceback
 from marshmallow import ValidationError
 
 from sqlalchemy.exc import IntegrityError, DataError, OperationalError, ProgrammingError, SQLAlchemyError
 from sqlalchemy.inspection import inspect
 
-from Delivery_app_BK.routers.utils.response import Response
 from Delivery_app_BK.models import db
 from Delivery_app_BK.models.managers.object_validators import DataStructureValidators
+
+if TYPE_CHECKING:
+    from Delivery_app_BK.routers.utils.response import Response
 
 action_type_map ={
     'create':['created','creating'],
@@ -20,7 +22,7 @@ class ObjectFiller:
     def fill_object(
         data: Union[dict, list],
         fill_function: Callable[[dict],Any], 
-        response: Response, 
+        response: "Response", 
         reference: str,
         add_to_session=True,
         action_type='create'
