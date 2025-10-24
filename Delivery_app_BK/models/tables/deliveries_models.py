@@ -1,20 +1,21 @@
 # Third-party dependecies
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime,Text
 from sqlalchemy import JSON
 from datetime import datetime, timezone
 
 # Local application imports
 from Delivery_app_BK.models import db
 from Delivery_app_BK.models.managers.object_obtainer import ObjectObtainer
+from Delivery_app_BK.models.managers.object_updator import ObjectUpdator
 
 
 
 
 
 # model definition of an order
-class Order(db.Model, ObjectObtainer):
+class Order(db.Model, ObjectObtainer, ObjectUpdator):
     __tablename__ = "Order"
 
     id = Column(Integer, primary_key=True)
@@ -40,6 +41,7 @@ class Order(db.Model, ObjectObtainer):
 
     # the order placement when being deliver
     delivery_arrangement = Column(Integer,nullable=True)
+    delivery_polyline = Column(Text)
 
     route_id = Column(Integer,ForeignKey("Route.id"), nullable=True)
 
@@ -54,14 +56,14 @@ class Order(db.Model, ObjectObtainer):
     
 
 # model definition for a route
-class Route(db.Model, ObjectObtainer):
+class Route(db.Model, ObjectObtainer, ObjectUpdator):
     __tablename__ = "Route"
 
     id = Column(Integer, primary_key=True)
     route_label = Column(String, nullable=False)
     delivery_date = Column(DateTime(timezone=True),default=lambda: datetime.now(timezone.utc))
 
-    assigned_driver = Column(String)  # Replace with ForeignKey(User.id) if you have a User model
+    assigned_driver = Column(String)  # Replace with ForeignKey(User.id) 
 
     expected_start_time = Column(String)
     expected_end_time = Column(String)
@@ -71,15 +73,28 @@ class Route(db.Model, ObjectObtainer):
     start_location = Column(JSONB().with_variant(JSON, "sqlite"))
     end_location = Column(JSONB().with_variant(JSON, "sqlite"))
 
-    state = Column(String)
+    # Foreign keys
+    state_id = Column(Integer,ForeignKey("RouteState.id"))
+    
     is_optimized = Column(Boolean, default=False)
 
+    # relationships
     delivery_orders = relationship(
         "Order",
         backref="route",
         order_by="Order.delivery_arrangement",
         cascade="all, delete-orphan"
     )
+
+    route_state = relationship(
+        "RouteState",
+        backref="route",
+    )
    
 
-   
+
+class RouteState(db.Model,ObjectObtainer, ObjectUpdator):
+    __tablename__ = "RouteState"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String)

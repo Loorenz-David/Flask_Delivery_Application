@@ -12,6 +12,11 @@ def service_update_route(data: dict) -> dict:
         column = ColumnInspector(field, Route)
 
 
+        # when notification system is set up add the push notification of route change sate to admins
+        # if field == 'state_id':
+           
+
+
         column_type = column.get_python_type()
         valid_value = ValueValidator.is_valid_value(value, column_type)
         

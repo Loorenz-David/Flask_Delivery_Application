@@ -75,7 +75,7 @@ class Item(db.Model, ObjectObtainer, ObjectUpdator):
         return f"<Item {self.article_number}>"
 
 
-class ItemType(db.Model, ObjectObtainer):
+class ItemType(db.Model, ObjectObtainer, ObjectUpdator):
     __tablename__ = "ItemType"
 
     id = Column(Integer, primary_key=True)
@@ -88,7 +88,7 @@ class ItemType(db.Model, ObjectObtainer):
     )
 
 
-class ItemCategory(db.Model, ObjectObtainer):
+class ItemCategory(db.Model, ObjectObtainer, ObjectUpdator):
     __tablename__ = "ItemCategory"
 
     id = Column(Integer, primary_key=True)
@@ -96,7 +96,7 @@ class ItemCategory(db.Model, ObjectObtainer):
 
 
 
-class ItemProperty(db.Model, ObjectObtainer):
+class ItemProperty(db.Model, ObjectObtainer, ObjectUpdator):
     __tablename__ = "ItemProperty"
 
     id = Column(Integer, primary_key=True)
@@ -120,14 +120,14 @@ class ItemProperty(db.Model, ObjectObtainer):
 
 
 
-class ItemState(db.Model,ObjectObtainer):
+class ItemState(db.Model,ObjectObtainer, ObjectUpdator):
     __tablename__ = "ItemState"
 
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
 
 
-class ItemPosition(db.Model,ObjectObtainer):
+class ItemPosition(db.Model,ObjectObtainer, ObjectUpdator):
     __tablename__ = "ItemPosition"
 
     id = Column(Integer, primary_key=True)

@@ -3,7 +3,7 @@ from sqlalchemy import Column
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 from datetime import datetime, timezone
 
-from typing import Any, Union
+from typing import Any
 from sqlalchemy.orm.exc import UnmappedInstanceError
 from sqlalchemy.exc import NoInspectionAvailable
 
@@ -12,9 +12,9 @@ class ActionValidator:
     def validate_query(self, query_filters):
         if isinstance(query_filters, dict):
             return query_filters
-        else:
-            self.response.set_error("Invalid query_filters format", 400)
-            return {} 
+
+        self.response.set_error("Invalid query_filters format", 400)
+        return None 
         
     def validate_requested_data(self, requested):
         if isinstance(requested, list):
@@ -26,10 +26,24 @@ class ActionValidator:
     def has_column(self, column: str) -> bool:
         return column in inspect(self.Obj).columns
 
-    def value_has_valid_format(self, column: str, value: Any) -> bool:
-        # gets the target column type in python type
-        column_type = inspect(self.Obj).columns[column]
-        column_python_type = column_type.type.python_type
+    def value_has_valid_format(self, column: str, value: Any, operation: str | None = None) -> bool:
+        # allows empty filters
+        if value is None:
+            return True
+
+        try:
+            column_type = inspect(self.Obj).columns[column]
+            column_python_type = column_type.type.python_type
+        except (KeyError, NotImplementedError, AttributeError):
+            # if SQLAlchemy cannot provide the python type, skip strict validation
+            return True
+
+        if isinstance(value, (list, tuple, set)):
+            return all(isinstance(item, column_python_type) for item in value)
+
+        if isinstance(value, dict):
+            # ranges or nested operations are validated elsewhere
+            return True
 
         # check if value and type is the same type
         if isinstance(value, column_python_type):

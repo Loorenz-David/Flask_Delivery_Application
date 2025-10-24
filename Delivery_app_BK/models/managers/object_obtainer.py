@@ -3,6 +3,9 @@ from typing import List, Dict, Any, Optional, Set
 
 from sqlalchemy.orm.collections import InstrumentedList
 
+from flask_sqlalchemy.model import Model
+from typing import Type
+
 
 class ObjectObtainer:
     """
@@ -42,30 +45,11 @@ class ObjectObtainer:
         # Ensure the columns to unpack is a list
         if isinstance(columns_to_unpack, list):
             for column in columns_to_unpack:
+
                 # Handle nested relationships (dict)
                 if isinstance(column, dict):
-                    for key, values in column.items():
-                        # Check for duplicates in observations
-                        if key in set_of_observations:
-                            raise Exception(f"passed duplicate column in dictionary: {key}")
+                   self.unpack_relationship( column, set_of_observations, unpack_data )
 
-                        # Ensure the attribute exists
-                        if not hasattr(self, key):
-                            raise ValueError(f"no relation with name: {key}")
-
-                        target_relation = getattr(self, key)
-                        set_of_observations.add(key)
-
-                        # If the relation is a list (one-to-many/many-to-many)
-                        if isinstance(target_relation, InstrumentedList):
-                            list_of_relations = []
-                            for obj in target_relation:
-                                # Recursively call to_dict on related objects
-                                list_of_relations.append(obj.to_dict(values))
-                            unpack_data[key] = list_of_relations
-                        else:
-                            # Single related object (one-to-one/many-to-one)
-                            unpack_data[key] = target_relation.to_dict(values)
                 else:
                     # Handle simple attribute (not a nested dict)
                     if not hasattr(self, column):
@@ -79,3 +63,33 @@ class ObjectObtainer:
             raise Exception(f"columns passed must be wrap in list: [ <-- {columns_to_unpack} --> ] ")
 
         return unpack_data
+    
+    def unpack_relationship(
+            self,
+            column:Dict,
+            set_of_observations:set,
+            unpack_data:dict
+    ):
+
+        for key, values in column.items():
+            # Check for duplicates in observations
+            if key in set_of_observations:
+                raise Exception(f"passed duplicate column in dictionary: {key}")
+
+            # Ensure the attribute exists
+            if not hasattr(self, key):
+                raise ValueError(f"no relation with name: {key}")
+
+            target_relation = getattr(self, key)
+            set_of_observations.add(key)
+
+            # If the relation is a list (one-to-many/many-to-many)
+            if isinstance(target_relation, InstrumentedList):
+                list_of_relations = []
+                for obj in target_relation:
+                    # Recursively call to_dict on related objects
+                    list_of_relations.append(obj.to_dict(values))
+                unpack_data[key] = list_of_relations
+            else:
+                # Single related object (one-to-one/many-to-one)
+                unpack_data[key] = target_relation.to_dict(values)
