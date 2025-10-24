@@ -7,8 +7,7 @@ from datetime import datetime, timezone
 
 # Local application imports
 from Delivery_app_BK.models import db
-from Delivery_app_BK.models.managers.object_obtainer import ObjectObtainer
-from Delivery_app_BK.models.managers.object_updator import ObjectUpdator
+from Delivery_app_BK.models.managers import ObjectObtainer, ObjectUpdator
 
 
 

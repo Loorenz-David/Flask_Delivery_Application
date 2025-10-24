@@ -6,8 +6,7 @@ from Delivery_app_BK.models import db
 
 # Local application imports
 
-from Delivery_app_BK.models.managers.object_obtainer import ObjectObtainer
-from Delivery_app_BK.models.managers.object_updator import ObjectUpdator
+from Delivery_app_BK.models.managers import ObjectObtainer, ObjectUpdator
 
 type_property_association = db.Table(
     "type_property_association",
@@ -132,4 +131,3 @@ class ItemPosition(db.Model,ObjectObtainer, ObjectUpdator):
 
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
-

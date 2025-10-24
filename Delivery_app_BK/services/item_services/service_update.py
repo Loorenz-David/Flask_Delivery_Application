@@ -1,7 +1,5 @@
 from Delivery_app_BK.models import Item, ItemState,ItemPosition, ItemProperty
-from Delivery_app_BK.models.managers.object_searcher import GetObject
-from Delivery_app_BK.models.managers.object_inspector import ColumnInspector
-from Delivery_app_BK.models.managers.object_validators import ValueValidator
+from Delivery_app_BK.models.managers import GetObject, ColumnInspector, ValueValidator
 
 
 

@@ -1,16 +1,11 @@
 # Third-party dependencies
 from flask import request
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from marshmallow import ValidationError
-import traceback
 
 # Locat Imports
 from Delivery_app_BK.debug_logger import logger
 from Delivery_app_BK.routers.utils.response import Response
-from Delivery_app_BK.models import Item, db
-from Delivery_app_BK.models.tables.items_models import ItemType, ItemCategory, ItemProperty
-from Delivery_app_BK.models.schemas.items_schema import ItemCreation,ItemTypeCreation, ItemCategoryCreation, ItemPropertyCreation
-from Delivery_app_BK.models.managers.object_filler import ObjectFiller
+from Delivery_app_BK.models.managers import ObjectFiller
 from Delivery_app_BK.services import (
     service_create_item_category,
     service_create_item_type,

@@ -16,6 +16,10 @@ from Delivery_app_BK.models import db
 from Delivery_app_BK.models.managers.object_validators import ActionValidator, InstanceValidator
 from Delivery_app_BK.routers.utils.response import Response
 
+"""
+ObjectSearcher is an object that builds query filters by giving column targets, value targets
+and the operation the filter should perform
+"""
 class ObjectSearcher(ActionValidator):
 
     FILTER_MAP = {
@@ -61,6 +65,7 @@ class ObjectSearcher(ActionValidator):
         self.paginated_query = None
         self.order_by_params = None
         self.pagination_params = None
+        self.count_of_objects_found = 0
 
         if data:
             if not isinstance(data, dict):
@@ -73,90 +78,90 @@ class ObjectSearcher(ActionValidator):
         self.requested_data = self.validate_requested_data(self.requested_data)
    
    
-
+    # builds query with the given filters, wrap this call in a try block to get the errors
     def build_query(self,query_filters=None):
-        try:
-            # query object
-            query = self.Obj.query
+        
+        # query object
+        query = self.Obj.query
+        
+        # one can overide the store filters when initializing the object by passing query_filters to build_query
+        filters_to_use = query_filters if query_filters is not None else self.query_filters
+
+        self.query_filters = self.validate_query(filters_to_use)
+
+
+        # loop over column, value pairs. each loop adds an _and or an _or filter to the end query
+        for column, op in self.query_filters.items():
             
-            # if there is no passed query query filters, it uses the one store in initiation
-            filters_to_use = query_filters if query_filters is not None else self.query_filters
-            validated_filters = self.validate_query(filters_to_use)
-            if validated_filters is None:
-                return False
-            self.query_filters = validated_filters
+            # if '.' in column then client is trying to add a filter through a relationship
+            if '.' in column:
+                query, target_column, operation, value = self.join_relationship_to_query(query, column, op)
 
-            if not self.query_filters:
-                self.query = query
-                return True
-
-            # loop over column value pairs modifying the end query
-            for column, op in self.query_filters.items():
-                if not isinstance(op, dict):
-                    self.response.set_error(
-                        message=f"Invalid filter format for column {column}. Expected dict with 'operation' and 'value'.",
-                        status=400
-                    )
-                    return False
-
-                # validates op (operation) if is a dict with required keys
-                if not (isinstance(op, dict) and 'operation' in op and 'value' in op):
-                    self.response.set_error(
-                        message=f"Invalid filter format for column {column}. Expected dict with 'operation' and 'value'.",
-                        status=400
-                    )
-                    return False
-
+            else:
+                op = self.validate_query_operation( operation, column )
                 operation = op['operation']
                 value = op['value']
 
                 # validates column exist in model
-                if not self.has_column(column):
-                    self.response.set_error(
-                        message=f"Invalid column {column} on table {self.Obj.__tablename__}.",
-                        status=400
-                    )
-                    return False
-
+                column = self.has_column( column, self.Obj )
                 # validates the value pass is of same type as column type
-                if not self.value_has_valid_format(column, value, operation):
-                    self.response.set_error(
-                        message=f"Invalid value type for column {column}, column accepts type {inspect(self.Obj).columns[column].type.python_type}.",
-                        status=400
-                    )
-                    return False
-
+                self.value_has_valid_format(column, value, operation)
                 # sets target
                 target_column = getattr(self.Obj, column)
 
-                if operation not in self.FILTER_MAP:
-                    self.response.set_error(
-                        message=f"Invalid filter operation '{operation}' for column {column}.",
-                        status=400
-                    )
-                    return False
+            if operation not in self.FILTER_MAP:
+                raise ValueError(
+                    f"Invalid filter operation in '{operation}' for column {column}.",
+                )
+                
+            # finds the target operation for query
+            query = self.FILTER_MAP[operation](query, target_column, value)
 
-                # finds the target operation for query
-                query = self.FILTER_MAP[operation](query, target_column, value)
 
-            self.query = query
-            return True
-
-        except (IntegrityError, DataError, OperationalError, ProgrammingError) as e:
-            self.response.set_error(str(e), status=400)
-            return False
-
-        except SQLAlchemyError as e:
-            self.response.set_error(f"Database error: {e}", status=500)
-            return False
-
-        except Exception as e:
-            self.response.set_error(f"Unexpected error: {e}", status=500)
-            return False
+        self.query = query
+        return True
     
+    # joins nested relationships to query
+    def join_relationship_to_query(self, query, column_path: str, op: dict):
+        """
+        Handles relationship traversal like 'client.orders.item_id'.
+        Returns (query, target_column)
+        """
+        path_parts = column_path.split(".")  # e.g. ["client", "orders", "item_id"]
+        current_model = self.Obj
+        current_query = query
+
+        # iterate over all but the last part (relationships)
+        for rel_name in path_parts[:-1]:
+            rel_attr = getattr(current_model, rel_name)
+            related_model = rel_attr.property.mapper.class_
+
+            # join if not already joined (SQLAlchemy lazy-joins duplicates fine)
+            current_query = current_query.join(rel_attr)
+
+            # update model for next step
+            current_model = related_model
+
+        # last part is the final column name
+        target_col_name = path_parts[-1]
+        target_col = getattr(current_model, target_col_name)
+
+        # validate the operation and value
+        op = self.validate_query_operation(op, target_col_name)
+        operation = op["operation"]
+        value = op["value"]
+        self.value_has_valid_format(target_col_name, value, operation)
+
+        # return both the updated query and the final column
+        return current_query, target_col, operation, value
+
+
+    # triggers a search on the build query
     def trigger_query(self):
         self.found_objects = self.query.all()
+        self.count_of_objects_found = len(self.found_objects)
     
+    # triggers a search on the build query with set pagination
     def paginate(self,pagination:dict):
         page = pagination.get('page')
         per_page = pagination.get('per_page')
@@ -171,9 +176,12 @@ class ObjectSearcher(ActionValidator):
             per_page = per_page,
             error_out=False
         )
-        
+
+        self.count_of_objects_found = self.paginated_query.total
+
         self.found_objects = self.paginated_query.items
 
+    # orders items by order_by
     def order_by(self,order_by:dict):
         column_name = order_by.get("column")
         direction = order_by.get("direction", "desc")
@@ -193,6 +201,7 @@ class ObjectSearcher(ActionValidator):
         else:
             self.query = self.query.order_by(column_attr.desc())
 
+    # unpacks the data with the given client list of columns
     def unpack(self,requested_data = None):
 
         # if there is no passed requeted data it uses the one store in initiation
@@ -221,6 +230,17 @@ class ObjectSearcher(ActionValidator):
 
         return True
 
+    # checks if there is found objects
+    def are_items_found(self):
+        if self.found_objects:
+            return True
+        return False
+
+
+"""
+GetObject is an object that queries on a model by id using db.session.get
+"""
+
 class GetObject:
     
     @staticmethod
@@ -240,6 +260,34 @@ class GetObject:
         
         return object_query
 
+
+"""
+FindObjects is an object that centralizes a query on the database, the client must provide a dictionary as follows
+{
+    "order_by": { "column": "created_date", direction: "desc" } 
+    # order by is optional, by default it will order by latest id with {"column": "id", "direction": "desc" }
+
+    "pagination": { "page": 1, "per_page": 20}
+    # pagination is optional, by default no pagination will be implemented, so it will return all query results.
+
+    "requested_data": [ "id", "client_name", {"items": [ "article_number" ] } ]
+    # if no requested data the response object will have an empty list but the FindObjects  will return True if items where found
+
+    "query": {
+        "client_name": { 
+            "value": "%robert%"
+            "operation": "ilike"
+        },
+        "address":{
+            "value": "some address 23"
+            "operation": "=="
+        }
+    }
+    # is a mandatory key, refer to the documentation to see the types of operations,
+    and how to query through relationships,
+    if the query dictionary is empty it gets all the objects.
+}
+"""
 class FindObjects:
 
     @staticmethod
@@ -265,7 +313,7 @@ class FindObjects:
             )
 
             
-            # performs the query 
+            # performs the query, 
             run_query = searcher.build_query()
             if not run_query:
                 return False
@@ -273,39 +321,73 @@ class FindObjects:
             if order_by:
                 searcher.order_by(order_by)
             
-            # if pagination was passed otherwise all results
+            
             if pagination:
+                # restrics the found objects to the page and per_page arguments, stores the items found on self.found_objects
                 searcher.paginate(pagination)
             else:
+                # stores all found results to self.found_objects
                 searcher.trigger_query()
 
-            # if request asked for return data
+            count_of_objects_found = searcher.count_of_objects_found
             if unpack_data:
-                # unpacks the found object into a dictionary format
+                # unpacks the found object into a dictionary format, if no items where found it will not
+                # raise an error, but it will set the response error message to "no items found" and return an empty list on key items.
                 if not searcher.unpack():
+                    response.set_payload({'items':[]})
                     return False
-                # add the unpacked data to the response
+                
+                # adds the unpacked data to the response
                 response.set_payload(searcher.unpacked_data)
+                
 
-
-            # compresses the payload to gzip
+            else:
+                # checks if items where found with out unpacking
+                if not searcher.are_items_found():
+                    response.set_payload({'items':[]})
+                    response.set_error(
+                        message = f"no items found",
+                        status = 200
+                    )
+                    
+                else:
+                    response.set_payload({'items':[]})
+                    response.set_error(
+                        message = f"items found, but not list of columns was given for unpacking data.",
+                        status = 200
+                    )
+                    
+            response.set_message(f"{count_of_objects_found} - Items found")
+            
             if compress_data:
+                # compresses the payload to gzip
                 response.compress_payload()
 
             return True
 
         except ValueError as e:
-            response.set_message(f'Something went wrong obtaining for {Model.__tablename__}')
+            response.set_message(f'ValueError when querying on table {Model.__tablename__}')
             response.set_error(
                 message = str(e),
                 status = 400
             )
         except Exception as e:
-            response.set_message(f'Something went wrong obtaining data for {Model.__tablename__}')
+            response.set_message(f'ExceptionError when querying on table {Model.__tablename__}')
             response.set_error(
                 message = str(e),
                 status = 400
             )
+        except (IntegrityError, DataError, OperationalError, ProgrammingError) as e:
+            response.set_message(f'Database Error when querying on {Model.__tablename__}')
+            response.set_error(str(e), status=400)
+        
+
+        except SQLAlchemyError as e:
+            response.set_message(f'Database Error when querying on {Model.__tablename__}')
+            response.set_error(str(e), status=500)
+            return False
+
+
 
         return False
         

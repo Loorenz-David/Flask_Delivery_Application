@@ -1,8 +1,6 @@
 
 # Local Imports 
-from Delivery_app_BK.models.managers.object_inspector import ColumnInspector
-from Delivery_app_BK.models.managers.object_linker import ObjectLinker
-from Delivery_app_BK.models.managers.object_validators import ValueValidator
+from Delivery_app_BK.models.managers import ColumnInspector, ObjectLinker, ValueValidator
 
 # import types 
 from typing import Type

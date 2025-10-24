@@ -9,24 +9,73 @@ from sqlalchemy.exc import NoInspectionAvailable
 
 class ActionValidator:
      
-    def validate_query(self, query_filters):
-        if isinstance(query_filters, dict):
-            return query_filters
-
-        self.response.set_error("Invalid query_filters format", 400)
-        return None 
+    def validate_query( 
+            self, 
+            query_filters:dict
+    ):
+        if not isinstance( query_filters, dict ):
+            raise ValueError("Invalid query_filters format, it must be of type dict as follows:",
+                            "Example:",
+                            "--> query_filters: {'column': {'value': 'target_value', 'operation': '=='} } <---"
+                         )
+        elif query_filters is None:
+            raise ValueError("Missing query filters, it must be a dict with the columns as keys and a value of type dict with ",
+                             "key value and key operation. Example:",
+                            "--> query_filters: {'column': {'value': 'target_value', 'operation': '=='} } <---"
+                             )
         
-    def validate_requested_data(self, requested):
+        return query_filters
+    
+
+    def validate_query_operation( 
+            self,
+            operation:dict, 
+            column:str
+    ):
+        if not isinstance( operation, dict ):
+            raise ValueError(f"Invalid operation format for column {column}. Expected dict with 'operation' and 'value'.",
+                            "Example:",
+                            "query_filters: {'column': ---> {'value': 'target_value', 'operation': '=='} <--- }"
+            )
+                
+        elif 'operation' not in operation or 'value' not in operation:
+            raise ValueError(f"Invalid operation format for column {column}. Expected dict with 'operation' and 'value'.",
+                            "Example:",
+                            "query_filters: {'column': ---> {'value': 'target_value', 'operation': '=='} <--- }"
+            )
+        return operation
+        
+
+    def validate_requested_data(
+            self, 
+            requested
+    ):
         if isinstance(requested, list):
             return requested
-        else:
-            self.response.set_error("Invalid requested_data format", 400)
-            return []
+        
+        raise ValueError("Invalid requested_data format, it must be of type list")
 
-    def has_column(self, column: str) -> bool:
-        return column in inspect(self.Obj).columns
 
-    def value_has_valid_format(self, column: str, value: Any, operation: str | None = None) -> bool:
+    def has_column(
+            self, 
+            column: str
+    ) -> bool:
+        if not isinstance( column, str ):
+            raise ValueError (f"Invalid column type for '{column}' on table {self.Obj.__tablename__}.",
+                              "Must be of type str"
+                              )
+
+        if not column in inspect( self.Obj ).columns:
+            raise ValueError (f"Invalid column {column} on table {self.Obj.__tablename__}.")
+
+        return column
+
+
+    def value_has_valid_format(
+            self, 
+            column: str, 
+            value: Any
+    ) -> bool:
         # allows empty filters
         if value is None:
             return True
@@ -49,7 +98,8 @@ class ActionValidator:
         if isinstance(value, column_python_type):
             return True
 
-        return False
+        raise ValueError(f"Invalid value type for column '{column}', column accepts type: '{column_python_type}' .")
+        
     
 class InstanceValidator:
 
