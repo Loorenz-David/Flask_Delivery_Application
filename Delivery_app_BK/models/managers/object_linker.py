@@ -10,11 +10,11 @@ class ObjectLinker:
     and parent are intances by performing a query. if the passed child or parent values are already instances it will just
     return that instance.
     '''
-    def __init__(self,child,child_model,parent,parent_model):
+    def __init__(self,child,child_model,parent,parent_model, identity=None):
 
-        self.child = GetObject.get_object(child_model,child)
+        self.child = GetObject.get_object(child_model,child, identity=identity)
         self.child_model = child_model
-        self.parent = GetObject.get_object(parent_model,parent)
+        self.parent = GetObject.get_object(parent_model,parent, identity=identity)
         self.parent_model = parent_model
     
     def link_using_foreign_key(self,column):

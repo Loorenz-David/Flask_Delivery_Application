@@ -10,7 +10,7 @@ from Delivery_app_BK.models import db
 from Delivery_app_BK.models.managers.object_obtainer import ObjectObtainer
 from Delivery_app_BK.models.mixins.teams_mixings import TeamScopedMixin
 from Delivery_app_BK.models.managers.object_updator import ObjectUpdator
-
+from werkzeug.security import generate_password_hash, check_password_hash
 
 class Team(db.Model, ObjectObtainer, ObjectUpdator):
     __tablename__ = "Team"
@@ -18,6 +18,12 @@ class Team(db.Model, ObjectObtainer, ObjectUpdator):
     name = Column(String, unique=True, nullable=False)
     created_at = Column(DateTime, default=lambda:  datetime.now(timezone.utc))
 
+    # a dictionary use by the front end to notify the user that there is configuration missing
+    missing_to_configure = Column(JSONB().with_variant(JSON, "sqlite")) 
+
+    # a dictionary made to check if the user has a valid subscription to use some properties
+    # last thing to develop
+    subscription = Column(JSONB().with_variant(JSON, "sqlite"))
 
 class User(db.Model,  ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     __tablename__ = "User"
@@ -40,6 +46,12 @@ class User(db.Model,  ObjectObtainer, ObjectUpdator, TeamScopedMixin):
         backref="users", 
         lazy=True
     )
+
+    def hash_password(self,password):
+        return generate_password_hash(password)
+    
+    def get_password(self):
+        return check_password_hash(self.password)
 
 
 class UserRole(db.Model,  ObjectObtainer, ObjectUpdator, TeamScopedMixin):

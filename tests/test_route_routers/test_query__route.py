@@ -16,13 +16,13 @@ def decode_response_payload(response_json: dict) -> dict:
     return json.loads(decompressed)
 
 
-def seed_route(client) -> None:
-    res = client.post("/route/create_route", json=ROUTE_PAYLOAD)
+def seed_route(client, headers) -> None:
+    res = client.post("/route/create_route", json=ROUTE_PAYLOAD, headers=headers)
     assert res.status_code == 200
 
 
-def test_query_route_returns_results(client):
-    seed_route(client)
+def test_query_route_returns_results(client, auth_headers):
+    seed_route(client, auth_headers)
 
     query_payload = {
         "query": {
@@ -31,7 +31,7 @@ def test_query_route_returns_results(client):
         "requested_data": ["id", "route_label"],
     }
 
-    res = client.post("/route/query_route", json=query_payload)
+    res = client.post("/route/query_route", json=query_payload, headers=auth_headers)
     assert res.status_code == 200
     body = res.get_json()
 

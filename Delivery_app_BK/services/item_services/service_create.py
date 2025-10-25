@@ -10,7 +10,7 @@ from Delivery_app_BK.models import (
     ItemState,
     ItemPosition,
 )
-from Delivery_app_BK.services import create_general_object
+from Delivery_app_BK.services.general_services.general_creation import create_general_object
 
 
 
@@ -22,39 +22,39 @@ it can me modified on the service function
 """
 
 # CREATE ItemCategory Instance
-def service_create_item_category(fields:dict) -> dict:
-    return create_general_object(fields, ItemCategory)
+def service_create_item_category(fields:dict, identity=None) -> dict:
+    return create_general_object(fields, ItemCategory, identity=identity)
 
 
 # CREATE ItemType Instance
-def service_create_item_type(fields:dict) -> dict:
+def service_create_item_type(fields:dict, identity=None) -> dict:
     rel_map = {
         'properties':ItemProperty
     }
 
-    return create_general_object(fields, ItemType,rel_map)
+    return create_general_object(fields, ItemType,rel_map, identity=identity)
 
 
 # CREATE ItemProperty Instance
-def service_create_item_property(fields:dict) -> dict:
+def service_create_item_property(fields:dict, identity=None) -> dict:
     rel_map = {
         'types':ItemType,
         "items":Item
     }
 
-    return create_general_object(fields, ItemProperty,rel_map)
+    return create_general_object(fields, ItemProperty,rel_map, identity=identity)
 
 # CREATE ItemState Instance
-def service_create_item_state(fields: dict) -> dict:
-    return create_general_object(fields, ItemState)
+def service_create_item_state(fields: dict, identity=None) -> dict:
+    return create_general_object(fields, ItemState, identity=identity)
 
 
 # CREATE ItemPosition Instance
-def service_create_item_position(fields: dict) -> dict:
-    return create_general_object(fields, ItemPosition)
+def service_create_item_position(fields: dict, identity=None) -> dict:
+    return create_general_object(fields, ItemPosition, identity=identity)
 
 # CREATE Item Instance
-def service_create_item(fields:dict) -> dict:
+def service_create_item(fields:dict, identity=None) -> dict:
     rel_map = {
         'order_id':Order,
         'item_type_id':ItemType,
@@ -64,4 +64,4 @@ def service_create_item(fields:dict) -> dict:
         'properties':ItemProperty
     }
 
-    return create_general_object(fields, Item, rel_map)
+    return create_general_object(fields, Item, rel_map, identity=identity)

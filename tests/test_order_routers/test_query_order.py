@@ -35,16 +35,16 @@ def build_item_payload(article_number: str) -> dict:
     }
 
 
-def seed_order(client) -> str:
+def seed_order(client, headers) -> str:
     # Item dependencies
-    client.post("/item/create_item_category", json=ITEM_CATEGORY)
-    client.post("/item/create_item_type", json=ITEM_TYPE)
-    client.post("/item/create_item_property", json=ITEM_PROPERTY)
-    client.post("/item/create_item_state", json=ITEM_STATE)
-    client.post("/item/create_item_position", json=ITEM_POSITION)
+    client.post("/item/create_item_category", json=ITEM_CATEGORY, headers=headers)
+    client.post("/item/create_item_type", json=ITEM_TYPE, headers=headers)
+    client.post("/item/create_item_property", json=ITEM_PROPERTY, headers=headers)
+    client.post("/item/create_item_state", json=ITEM_STATE, headers=headers)
+    client.post("/item/create_item_position", json=ITEM_POSITION, headers=headers)
 
     # Route dependencies
-    route_res = client.post("/route/create_route", json=ROUTE_PAYLOAD)
+    route_res = client.post("/route/create_route", json=ROUTE_PAYLOAD, headers=headers)
     assert route_res.status_code == 200
 
     order_payload = {
@@ -53,13 +53,13 @@ def seed_order(client) -> str:
         "delivery_items": [build_item_payload("ART-100")],
     }
 
-    res = client.post("/order/create_order", json=order_payload)
+    res = client.post("/order/create_order", json=order_payload, headers=headers)
     assert res.status_code == 200
     return order_payload["delivery_items"][0]["article_number"]
 
 
-def test_query_order_returns_results_with_nested_items(client):
-    article_number = seed_order(client)
+def test_query_order_returns_results_with_nested_items(client, auth_headers):
+    article_number = seed_order(client, auth_headers)
 
     query_payload = {
         "query": {"client_name": {"operation": "==", "value": CLIENT_NAME}},
@@ -70,7 +70,7 @@ def test_query_order_returns_results_with_nested_items(client):
         ],
     }
 
-    res = client.post("/order/query_order", json=query_payload)
+    res = client.post("/order/query_order", json=query_payload, headers=auth_headers)
     body = res.get_json()
     assert res.status_code == 200
     

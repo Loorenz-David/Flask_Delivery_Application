@@ -1,7 +1,7 @@
 # Local Imports
 from Delivery_app_BK.models import Order,Route,db
-from Delivery_app_BK.services import create_general_object
-from Delivery_app_BK.services import service_create_item
+from Delivery_app_BK.services.general_services.general_creation import create_general_object
+from Delivery_app_BK.services.item_services.service_create import service_create_item
 
 
 """
@@ -11,7 +11,7 @@ it can me modified on the service function
 """
 
 # CREATE Order Instance and if Items passed to order
-def service_create_order(fields:dict)->dict:
+def service_create_order(fields:dict, identity=None)->dict:
 
     # provie the rel map for Route
     rel_map = {
@@ -30,7 +30,7 @@ def service_create_order(fields:dict)->dict:
              raise ValueError("Wrong format for creating item. items fields must be in dictionary")
     
     # creates Order instance 
-    new_order = create_general_object(fields, Order, rel_map)
+    new_order = create_general_object(fields, Order, rel_map, identity=identity)
     order_instance = new_order["instance"]
     
     if new_order["status"] == "ok":
@@ -43,7 +43,7 @@ def service_create_order(fields:dict)->dict:
             item_fields["order_id"] = order_instance.id
           
             # creates Item instance 
-            new_item = service_create_item(item_fields)
+            new_item = service_create_item(item_fields, identity=identity)
 
             
             
@@ -58,6 +58,5 @@ def service_create_order(fields:dict)->dict:
 
     return {'status':'ok','instance': []}
         
-
 
 

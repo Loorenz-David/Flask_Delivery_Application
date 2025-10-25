@@ -14,6 +14,11 @@ from flask_sqlalchemy.model import Model
 # Local Imports
 from Delivery_app_BK.models import db
 from Delivery_app_BK.models.managers.object_validators import ActionValidator, InstanceValidator
+from Delivery_app_BK.services.utils import (
+    ensure_instance_in_team,
+    model_requires_team,
+    require_team_id,
+)
 
 if TYPE_CHECKING:
     from Delivery_app_BK.routers.utils.response import Response
@@ -252,21 +257,24 @@ GetObject is an object that queries on a model by id using db.session.get
 class GetObject:
     
     @staticmethod
-    def get_object(Model,id):
+    def get_object(Model,id, identity=None):
         
         if not InstanceValidator.is_sqlalchemy_instance(Model):
             raise Exception
         
         if InstanceValidator.is_sqlalchemy_instance(id):
-            return id
-        
-        with db.session.no_autoflush:
-            object_query = db.session.get(Model,id)
-    
-        if not object_query:
-            raise NoResultFound(f"No {Model.__name__} found with id '{id}'")
-        
-        return object_query
+            obj = id
+        else:
+            with db.session.no_autoflush:
+                object_query = db.session.get(Model,id)
+            if not object_query:
+                raise NoResultFound(f"No {Model.__name__} found with id '{id}'")
+            obj = object_query
+
+        if hasattr(obj, "team_id"):
+            ensure_instance_in_team(obj, identity)
+
+        return obj
 
 
 """
@@ -302,18 +310,30 @@ class FindObjects:
     def find_objects(
         response:"Response",
         Model:Model,
-        incoming_data:dict,
         compress_data = True,
-        unpack_data = True
+        unpack_data = True,
+        identity=None
     ):
         
         try:
-            
-            incoming_data = incoming_data or {}
+            if response.error:
+                return False
+
+            identity = identity or getattr(response, "identity", None)
+
+            incoming_data = response.incoming_data
+            if incoming_data is None:
+                incoming_data = {}
+            if not isinstance(incoming_data, dict):
+                raise ValueError("Query payload must be provided as a dictionary.")
             
             order_by = incoming_data.get('order_by', { "column": "id", "direction": "desc" })
             pagination = incoming_data.get('pagination', None)
-            query_filters = incoming_data.get('query', {})
+            query_filters = dict(incoming_data.get('query', {}))
+            if model_requires_team(Model):
+                team_id = require_team_id(identity)
+                query_filters.setdefault('team_id', {'operation': '==', 'value': team_id})
+
             requested_data = incoming_data.get('requested_data', [])
             searcher = ObjectSearcher(
                 Obj=Model, 
@@ -380,6 +400,12 @@ class FindObjects:
             response.set_error(
                 message = str(e),
                 status = 400
+            )
+        except PermissionError as e:
+            response.set_message("Unauthorized")
+            response.set_error(
+                message = str(e),
+                status = 403
             )
         except Exception as e:
             response.set_message(f'ExceptionError when querying on table {Model.__tablename__}')

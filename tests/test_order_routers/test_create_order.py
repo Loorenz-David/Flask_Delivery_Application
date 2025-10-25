@@ -3,13 +3,13 @@ import logging
 from tests.test_item_routers.test_create_items import test_item, setup_item_dependencies_creation
 
 @pytest.fixture
-def dependencies_for_order(client):
+def dependencies_for_order(client, auth_headers):
     data = {
         "route_label":"tiptapp",
         "delivery_date":"2025-11-07"
     }
    
-    res = client.post("/route/create_route",json=data)
+    res = client.post("/route/create_route",json=data, headers=auth_headers)
     json_re = res.get_json()
    
 
@@ -17,7 +17,8 @@ def test_create_order(
         client,
         dependencies_for_order,
         caplog,setup_logger,
-        setup_item_dependencies_creation
+        setup_item_dependencies_creation,
+        auth_headers
 ):
     caplog.set_level(logging.DEBUG)
    
@@ -29,7 +30,7 @@ def test_create_order(
         ]
     }
 
-    res = client.post("/order/create_order",json=order_data)   
+    res = client.post("/order/create_order",json=order_data, headers=auth_headers)   
     json_res = res.get_json()
     
    

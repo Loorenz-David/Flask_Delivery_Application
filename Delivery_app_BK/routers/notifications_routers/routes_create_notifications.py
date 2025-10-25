@@ -1,4 +1,5 @@
 from flask import request
+from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from . import notifications_bp
 from Delivery_app_BK.routers.utils.response import Response
@@ -11,12 +12,13 @@ from Delivery_app_BK.services import (
 
 
 @notifications_bp.route("/create_email_smtp", methods=["POST"])
+@jwt_required()
 def create_email_smtp():
-    response = Response()
-    incoming_data = request.get_json()
+    identity = get_jwt_identity()
+    incoming_data = request.get_json(silent=True)
+    response = Response(incoming_data=incoming_data, identity=identity)
 
     ObjectFiller.fill_object(
-        data=incoming_data,
         fill_function=service_create_email_smtp,
         response=response,
         reference="Email SMTP configuration",
@@ -26,12 +28,13 @@ def create_email_smtp():
 
 
 @notifications_bp.route("/create_twilio_mod", methods=["POST"])
+@jwt_required()
 def create_twilio_mod():
-    response = Response()
-    incoming_data = request.get_json()
+    identity = get_jwt_identity()
+    incoming_data = request.get_json(silent=True)
+    response = Response(incoming_data=incoming_data, identity=identity)
 
     ObjectFiller.fill_object(
-        data=incoming_data,
         fill_function=service_create_twilio_mod,
         response=response,
         reference="Twilio configuration",
@@ -41,12 +44,13 @@ def create_twilio_mod():
 
 
 @notifications_bp.route("/create_message_template", methods=["POST"])
+@jwt_required()
 def create_message_template():
-    response = Response()
-    incoming_data = request.get_json()
+    identity = get_jwt_identity()
+    incoming_data = request.get_json(silent=True)
+    response = Response(incoming_data=incoming_data, identity=identity)
 
     ObjectFiller.fill_object(
-        data=incoming_data,
         fill_function=service_create_message_template,
         response=response,
         reference="Message Template",

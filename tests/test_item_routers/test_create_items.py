@@ -17,64 +17,64 @@ test_item = {
     }
 
 # CREATE ItemState Instance
-def test_create_item_state(client):
-    res = client.post("/item/create_item_state", json=test_state)
+def test_create_item_state(client, auth_headers):
+    res = client.post("/item/create_item_state", json=test_state, headers=auth_headers)
 
     assert res.status_code == 200
     assert 'Item State' in res.get_json()['message']
 
 
 # CREATE ItemPosition Instance
-def test_create_item_position(client):
-    res = client.post("/item/create_item_position", json=test_position)
+def test_create_item_position(client, auth_headers):
+    res = client.post("/item/create_item_position", json=test_position, headers=auth_headers)
 
     assert res.status_code == 200
     assert 'Item Position' in res.get_json()['message']
 
 
 # CREAT ItemType Instance
-def test_create_item_type(client):
-    res = client.post("/item/create_item_type",json= test_type)
+def test_create_item_type(client, auth_headers):
+    res = client.post("/item/create_item_type",json= test_type, headers=auth_headers)
 
     assert res.status_code == 200
     assert 'Item Type' in res.get_json()['message']
 
 # CREATE ItemProperty Instance
-def test_create_item_porperties(client):
-    res = client.post("/item/create_item_property",json= test_properties)
+def test_create_item_porperties(client, auth_headers):
+    res = client.post("/item/create_item_property",json= test_properties, headers=auth_headers)
 
     assert res.status_code == 200
     assert 'Item Property' in res.get_json()['message']
 
 # Create ItemCategory Instance
-def test_create_item_category(client):
+def test_create_item_category(client, auth_headers):
    
     # Test the category creation route.
-    res = client.post("/item/create_item_category",json=test_category)
+    res = client.post("/item/create_item_category",json=test_category, headers=auth_headers)
    
     assert res.status_code == 200
     assert 'Item Category' in res.get_json()["message"]
 
 # Sets up dependencies for the functions test_create_item
 @pytest.fixture
-def setup_item_dependencies_creation(client):
+def setup_item_dependencies_creation(client, auth_headers):
 
-    client.post('/item/create_item_category', json= test_category)
-    client.post('/item/create_item_type', json= test_type)
-    client.post('/item/create_item_property', json= test_properties)
-    client.post('/item/create_item_property', json= test_properties)
+    client.post('/item/create_item_category', json= test_category, headers=auth_headers)
+    client.post('/item/create_item_type', json= test_type, headers=auth_headers)
+    client.post('/item/create_item_property', json= test_properties, headers=auth_headers)
+    client.post('/item/create_item_property', json= test_properties, headers=auth_headers)
 
-    client.post('/item/create_item_state', json= test_state)
-    client.post('/item/create_item_position', json= test_position)
-    client.post('/item/create_item_state', json= test_state)
-    client.post('/item/create_item_position', json= test_position)
+    client.post('/item/create_item_state', json= test_state, headers=auth_headers)
+    client.post('/item/create_item_position', json= test_position, headers=auth_headers)
+    client.post('/item/create_item_state', json= test_state, headers=auth_headers)
+    client.post('/item/create_item_position', json= test_position, headers=auth_headers)
 
     
 
 # Create Item Instance
-def test_create_item(client, setup_item_dependencies_creation,caplog):
+def test_create_item(client, setup_item_dependencies_creation,caplog, auth_headers):
     caplog.set_level(logging.DEBUG)
-    res = client.post('/item/create_item',json=test_item)
+    res = client.post('/item/create_item',json=test_item, headers=auth_headers)
 
     assert res.status_code == 200
     assert 'Item' in res.get_json()['message']

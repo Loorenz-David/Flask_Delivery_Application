@@ -1,5 +1,6 @@
 # Third-party dependencies
 from flask import request
+from flask_jwt_extended import get_jwt_identity, jwt_required
 
 # Locat Imports
 from . import order_bp
@@ -8,16 +9,15 @@ from Delivery_app_BK.models import Order
 from Delivery_app_BK.models.managers.object_searcher import FindObjects
 
 @order_bp.route("/query_order",methods=['POST'])
+@jwt_required()
 def query_order ():
-    print('at the beginning ')
-    response = Response()
-    incoming_data = request.get_json()
-    print('incoming data: ', incoming_data)
+    identity = get_jwt_identity()
+    incoming_data = request.get_json(silent=True)
+    response = Response(incoming_data=incoming_data, identity=identity)
+
     FindObjects.find_objects(
         response=response,
         Model=Order,
-        incoming_data=incoming_data
+        identity=identity,
     )
-    print("RESPONSE OBJ")
-    print(response)
     return response.build()

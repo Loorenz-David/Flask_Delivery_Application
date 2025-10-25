@@ -1,40 +1,46 @@
-from Delivery_app_BK.models.managers.object_inspector import ColumnInspector
-from Delivery_app_BK.models.managers.object_linker import ObjectLinker
-from Delivery_app_BK.models.managers.object_searcher import GetObject
 
 from  datetime import datetime, timezone
 
 # types
-from typing import Type
-from flask_sqlalchemy.model import Model
-from Delivery_app_BK.models.managers.object_inspector import ColumnInspector
+from typing import Type, TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    from Delivery_app_BK.models.managers.object_inspector import ColumnInspector
+    from flask_sqlalchemy.model import Model
 
 class ObjectUpdator:
-
-
+    
+    
     def update_link (
             self,
-            column:ColumnInspector,
+            column:"ColumnInspector",
             value, 
-            target_model:Type[Model], 
-            record_column:str | None =None
+            target_model:Type["Model"], 
+            record_column:str | None =None,
+            identity=None
     ):
+        from Delivery_app_BK.models.managers.object_linker import ObjectLinker
+
 
         self_table = self.__class__
+        object_linker = None
         
         if column.is_foreign_key():
-            object_linker = ObjectLinker( self, self_table, value, target_model )
+            object_linker = ObjectLinker( self, self_table, value, target_model, identity=identity )
             object_linker.link_using_foreign_key( column.column_name)
 
         elif column.is_relationship():
             
-            self.update_relationship_change( column, value )
+            self.update_relationship_change( column, value, identity=identity )
 
         else:
             raise ValueError(f"Column '{column.column_name}' is not relatioship or foreign key",
                              f"to model '{target_model.__tablename__}'")
 
         if record_column:        
+            if object_linker is None:
+                raise ValueError("Record column tracking is only supported for direct foreign key updates")
             target_label = object_linker.parent.name
             self.update_record(record_column,target_label)
             
@@ -43,7 +49,7 @@ class ObjectUpdator:
    
 
     def update_record(
-            self:Model, 
+            self:"Model", 
             column_name:str, 
             value:str
     ):   
@@ -60,10 +66,12 @@ class ObjectUpdator:
 
     def update_relationship_change(
             self,
-            column:ColumnInspector,
-            value:list
+            column:"ColumnInspector",
+            value:list,
+            identity=None
     ):
-        
+        from Delivery_app_BK.models.managers.object_searcher import GetObject
+
         # gets the table where the relationship is pointing
         target_model = column.relationship.mapper.class_
 
@@ -96,7 +104,7 @@ class ObjectUpdator:
      
         # adds the relationships in O(n)
         for id in relationships_to_add_ids:
-            obj_lookup = GetObject.get_object(target_model,id)
+            obj_lookup = GetObject.get_object(target_model,id, identity=identity)
             relationship_list.append(obj_lookup)
 
         setattr(self, column.column_name, relationship_list)

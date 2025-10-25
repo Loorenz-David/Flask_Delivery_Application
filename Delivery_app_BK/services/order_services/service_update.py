@@ -3,7 +3,7 @@ from Delivery_app_BK.models.managers.object_searcher import GetObject
 from Delivery_app_BK.models.managers.object_inspector import ColumnInspector
 from Delivery_app_BK.models.managers.object_validators import ValueValidator, DataStructureValidators
 
-from Delivery_app_BK.services import service_create_item
+from Delivery_app_BK.services.item_services.service_create import service_create_item
 
 def write_order ( current_obj_id, val_1, val_2, to_add, obj_list:list[Order], add_loop= 0 ):
     for indx in range( val_1, val_2 + add_loop ):
@@ -37,8 +37,8 @@ def helper_order_arrangement (order_obj:Order, new_arrangement:int, route:Route)
     order_obj.delivery_arrangement = new_arrangement 
    
 
-def service_update_order(data: dict) -> dict:
-    order_obj:Order = GetObject.get_object(Order, data.get("id"))
+def service_update_order(data: dict, identity=None) -> dict:
+    order_obj:Order = GetObject.get_object(Order, data.get("id"), identity=identity)
     route_has_change = False
     new_route = 0
     fields: dict = data.get("fields", {})
@@ -74,10 +74,9 @@ def service_update_order(data: dict) -> dict:
         if column_name == "delivery_arrangement":
 
             if route_has_change:
-                route_obj = GetObject.get_object(Route, new_route)
-    
+                route_obj = GetObject.get_object(Route, new_route, identity=identity)
             else:
-                route_obj:Route = order_obj.route
+                route_obj = order_obj.route
 
             helper_order_arrangement(
                 order_obj = order_obj, 
@@ -97,7 +96,7 @@ def service_update_order(data: dict) -> dict:
                     item_fields["order_id"] = order_obj
 
                 # creates the item
-                new_item = service_create_item(item_fields)
+                new_item = service_create_item(item_fields, identity=identity)
                 if new_item['status'] == 'ok':
                     items_created.append(new_item["instance"])
 

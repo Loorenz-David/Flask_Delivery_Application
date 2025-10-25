@@ -1,9 +1,8 @@
-from typing import Any, Union, Callable, TYPE_CHECKING
+from typing import Any, Callable, TYPE_CHECKING
 import traceback
 from marshmallow import ValidationError
 
 from sqlalchemy.exc import IntegrityError, DataError, OperationalError, ProgrammingError, SQLAlchemyError
-from sqlalchemy.inspection import inspect
 
 from Delivery_app_BK.models import db
 from Delivery_app_BK.models.managers.object_validators import DataStructureValidators
@@ -20,18 +19,24 @@ action_type_map ={
 class ObjectFiller:
     @staticmethod
     def fill_object(
-        data: Union[dict, list],
-        fill_function: Callable[[dict],Any], 
-        response: "Response", 
+        response: "Response",
+        fill_function: Callable[[dict], Any],
         reference: str,
         add_to_session=True,
         action_type='create'
     ) -> bool:
-        
-        
         try:
+            if response.error:
+                return False
+
+            data = response.incoming_data
+            if data is None:
+                raise ValueError(f"No data provided for {reference}")
+
+            identity = getattr(response, "identity", None)
+
             # Initial validation of data structure
-            data = DataStructureValidators.is_list_of_dicts( data )
+            data = DataStructureValidators.is_list_of_dicts(data)
 
             objs = []
             for object_fields in data:
@@ -44,8 +49,7 @@ class ObjectFiller:
                         action_type = action_type
                     )
                 
-                # call the function for filling up the object
-                res = fill_function(object_fields)
+                res = fill_function(object_fields, identity=identity)
                 
                 if res["status"] == 'ok':
                     if isinstance(res["instance"],list):
@@ -74,6 +78,9 @@ class ObjectFiller:
         except ValidationError as err:
             response.set_error(message=err.messages, status=400)
             response.set_message("Validation failed")
+        except PermissionError as err:
+            response.set_error(message=str(err), status=403)
+            response.set_message("Unauthorized")
         except IntegrityError as e:
             db.session.rollback()
             response.set_error(message=str(e.orig), status=400)

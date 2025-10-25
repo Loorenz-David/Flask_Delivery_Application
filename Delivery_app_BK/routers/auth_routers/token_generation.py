@@ -20,8 +20,12 @@ token_generation_bp = Blueprint("token_generation_bp",__name__)
 # logs user in by returning a access and refresh token
 @token_generation_bp.route('/login',methods=['POST','GET'])
 def login():
-    response = Response()
-    incoming_data = request.get_json()
+    incoming_data = request.get_json(silent=True)
+    response = Response(incoming_data=incoming_data)
+    if response.error:
+        return response.build()
+
+    incoming_data = response.incoming_data or {}
 
     # Validates incoming data
     try:
@@ -42,18 +46,19 @@ def login():
     try:
         # query for user and pasword match check
         query = User.query
-        user = query.filter(User.email == email).first()
+        user:User = query.filter(User.email == email).first()
         if not user:
-            raise Exception()
+            raise Exception("Incorrect loging information")
         
-        if not user.password == password:
-            raise Exception()
+        if not user.get_password() == password:
+            raise Exception("Incorrect loging information")
         
         # generates access token ( default: expires in 1 hour ). 
         # generates refresh token ( default: expires in 7 days ). 
         # to change this default behaviors modify Delivery_app_BK __init__.py, keys with substrings JWT and EXPIRES
-        access_token = create_access_token(identity=user.id)
-        refresh_token = create_refresh_token(identity=user.id)
+        identity_data = {"user_id": user.id, "team_id": user.team_id}
+        access_token = create_access_token(identity=identity_data)
+        refresh_token = create_refresh_token(identity=identity_data)
 
         # set the return payload 
         response.set_payload({
@@ -67,8 +72,9 @@ def login():
 
     # error on query
     except Exception as e:
-        print(e)
-        response.set_error(message="something went wrong")
+        response.set_message(message=str(e))
+        response.set_error(message=str(e))
+
         return response.build()
     
 
@@ -80,8 +86,8 @@ def refresh():
 
     # gets the user id coming from the refresh token,
     # and generates a new access token
-    user_id = get_jwt_identity()
-    new_access = create_access_token(identity=user_id)
+    identity_data = get_jwt_identity()
+    new_access = create_access_token(identity=identity_data)
 
     # sets the payload for the response
     response.set_payload({
@@ -89,4 +95,4 @@ def refresh():
     })
 
     # return status 200 with payload
-    return response.set_payload()
+    return response.build()

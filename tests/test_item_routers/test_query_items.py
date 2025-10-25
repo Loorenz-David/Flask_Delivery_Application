@@ -27,18 +27,18 @@ def decode_response_payload(response_json: dict) -> dict:
     return json.loads(decompressed)
 
 
-def seed_item(client) -> None:
-    client.post("/item/create_item_category", json=ITEM_CATEGORY)
-    client.post("/item/create_item_type", json=ITEM_TYPE)
-    client.post("/item/create_item_property", json=ITEM_PROPERTY)
-    client.post("/item/create_item_state", json=ITEM_STATE)
-    client.post("/item/create_item_position", json=ITEM_POSITION)
-    create_res = client.post("/item/create_item", json=ITEM_PAYLOAD)
+def seed_item(client, headers) -> None:
+    client.post("/item/create_item_category", json=ITEM_CATEGORY, headers=headers)
+    client.post("/item/create_item_type", json=ITEM_TYPE, headers=headers)
+    client.post("/item/create_item_property", json=ITEM_PROPERTY, headers=headers)
+    client.post("/item/create_item_state", json=ITEM_STATE, headers=headers)
+    client.post("/item/create_item_position", json=ITEM_POSITION, headers=headers)
+    create_res = client.post("/item/create_item", json=ITEM_PAYLOAD, headers=headers)
     assert create_res.status_code == 200
 
 
-def test_query_item_returns_expected_payload(client):
-    seed_item(client)
+def test_query_item_returns_expected_payload(client, auth_headers):
+    seed_item(client, auth_headers)
 
     query_payload = {
         "query": {
@@ -47,7 +47,7 @@ def test_query_item_returns_expected_payload(client):
         "requested_data": ["id", "article_number", "item_type_id"],
     }
 
-    res = client.post("/item/query_item", json=query_payload)
+    res = client.post("/item/query_item", json=query_payload, headers=auth_headers)
     assert res.status_code == 200
     body = res.get_json()
 

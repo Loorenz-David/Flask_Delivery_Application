@@ -1,4 +1,5 @@
 from flask import request
+from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from . import user_bp
 from Delivery_app_BK.routers.utils.response import Response
@@ -12,12 +13,13 @@ from Delivery_app_BK.services import (
 
 
 @user_bp.route("/update_user", methods=["PUT"])
+@jwt_required()
 def update_user():
-    response = Response()
-    incoming_data = request.get_json()
+    identity = get_jwt_identity()
+    incoming_data = request.get_json(silent=True)
+    response = Response(incoming_data=incoming_data, identity=identity)
 
     ObjectFiller.fill_object(
-        data=incoming_data,
         fill_function=service_update_user,
         response=response,
         reference="User",
@@ -29,12 +31,13 @@ def update_user():
 
 
 @user_bp.route("/update_team", methods=["PUT"])
+@jwt_required()
 def update_team():
-    response = Response()
-    incoming_data = request.get_json()
+    identity = get_jwt_identity()
+    incoming_data = request.get_json(silent=True)
+    response = Response(incoming_data=incoming_data, identity=identity)
 
     ObjectFiller.fill_object(
-        data=incoming_data,
         fill_function=service_update_team,
         response=response,
         reference="Team",
@@ -46,12 +49,13 @@ def update_team():
 
 
 @user_bp.route("/update_user_role", methods=["PUT"])
+@jwt_required()
 def update_user_role():
-    response = Response()
-    incoming_data = request.get_json()
+    identity = get_jwt_identity()
+    incoming_data = request.get_json(silent=True)
+    response = Response(incoming_data=incoming_data, identity=identity)
 
     ObjectFiller.fill_object(
-        data=incoming_data,
         fill_function=service_update_user_role,
         response=response,
         reference="User Role",
@@ -63,12 +67,13 @@ def update_user_role():
 
 
 @user_bp.route("/update_user_warehouse", methods=["PUT"])
+@jwt_required()
 def update_user_warehouse():
-    response = Response()
-    incoming_data = request.get_json()
+    identity = get_jwt_identity()
+    incoming_data = request.get_json(silent=True)
+    response = Response(incoming_data=incoming_data, identity=identity)
 
     ObjectFiller.fill_object(
-        data=incoming_data,
         fill_function=service_update_user_warehouse,
         response=response,
         reference="User Warehouse",

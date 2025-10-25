@@ -4,8 +4,8 @@ from Delivery_app_BK.models.managers.object_inspector import ColumnInspector
 from Delivery_app_BK.models.managers.object_validators import ValueValidator
 
 
-def service_update_route(data: dict) -> dict:
-    route_obj = GetObject.get_object(Route, data.get("id"))
+def service_update_route(data: dict, identity=None) -> dict:
+    route_obj = GetObject.get_object(Route, data.get("id"), identity=identity)
 
     fields: dict = data.get("fields", {})
     for field, value in fields.items():

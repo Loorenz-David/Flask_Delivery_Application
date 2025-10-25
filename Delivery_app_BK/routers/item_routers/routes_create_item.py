@@ -3,8 +3,6 @@ from flask import request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 # Locat Imports
-from Delivery_app_BK.debug_logger import logger
-
 from Delivery_app_BK.models.managers.object_filler import ObjectFiller
 from Delivery_app_BK.services import (
     service_create_item_category,
@@ -20,62 +18,63 @@ from Delivery_app_BK.routers.utils.response import Response
 
 # CREATE ItemCategory Instance
 @item_bp.route("/create_item_category", methods=["POST"])
+@jwt_required()
 def create_item_category():
-    response = Response()
-    incoming_data = request.get_json()
+    identity = get_jwt_identity()
+    incoming_data = request.get_json(silent=True)
+    response = Response(incoming_data=incoming_data, identity=identity)
 
-    type_build = ObjectFiller.fill_object(
-        data = incoming_data,
-        fill_function = service_create_item_category,
-        response = response,
-        reference = "Item Category"
+    ObjectFiller.fill_object(
+        response=response,
+        fill_function=service_create_item_category,
+        reference="Item Category",
     )
-
     return response.build()
 
 # CREATE ItemType Instance
 @item_bp.route("/create_item_type", methods=["POST"])
+@jwt_required()
 def create_item_type():
-    response = Response()
-    incoming_data = request.get_json()
+    identity = get_jwt_identity()
+    incoming_data = request.get_json(silent=True)
+    response = Response(incoming_data=incoming_data, identity=identity)
 
-    type_build = ObjectFiller.fill_object(
-        data = incoming_data,
-        fill_function = service_create_item_type,
-        response = response,
-        reference = "Item Type"
+    ObjectFiller.fill_object(
+        response=response,
+        fill_function=service_create_item_type,
+        reference="Item Type",
     )
-    
-
     return response.build()
 
 
 # CREATE ItemProperty Instance
 @item_bp.route("/create_item_property", methods=["POST"])
+@jwt_required()
 def create_item_property():
-    response = Response()
-    incoming_data = request.get_json()
+    identity = get_jwt_identity()
+    incoming_data = request.get_json(silent=True)
+    response = Response(incoming_data=incoming_data, identity=identity)
 
-    properties_build = ObjectFiller.fill_object(
-        data = incoming_data,
-        fill_function = service_create_item_property,
-        response = response,
-        reference = "Item Property"
+    ObjectFiller.fill_object(
+        response=response,
+        fill_function=service_create_item_property,
+        reference="Item Property",
     )
     
     return response.build()
 
 # CREATE Item Instance
 @item_bp.route("/create_item",methods=['POST'])
+@jwt_required()
 def create_item ():
-    response = Response()
-    incoming_data = request.get_json()
+    identity = get_jwt_identity()
+    incoming_data = request.get_json(silent=True)
+    response = Response(incoming_data=incoming_data, identity=identity)
 
-    item_build = ObjectFiller.fill_object(
-        data = incoming_data,
-        fill_function = service_create_item,
-        response = response,
-        reference = "Item"
+    ObjectFiller.fill_object(
+        response=response,
+        fill_function=service_create_item,
+        reference="Item",
     )
 
     return response.build()
@@ -83,12 +82,13 @@ def create_item ():
 
 # CREATE ItemState Instance
 @item_bp.route("/create_item_state", methods=["POST"])
+@jwt_required()
 def create_item_state():
-    response = Response()
-    incoming_data = request.get_json()
+    identity = get_jwt_identity()
+    incoming_data = request.get_json(silent=True)
+    response = Response(incoming_data=incoming_data, identity=identity)
 
     ObjectFiller.fill_object(
-        data=incoming_data,
         fill_function=service_create_item_state,
         response=response,
         reference="Item State",
@@ -99,12 +99,13 @@ def create_item_state():
 
 # CREATE ItemPosition Instance
 @item_bp.route("/create_item_position", methods=["POST"])
+@jwt_required()
 def create_item_position():
-    response = Response()
-    incoming_data = request.get_json()
+    identity = get_jwt_identity()
+    incoming_data = request.get_json(silent=True)
+    response = Response(incoming_data=incoming_data, identity=identity)
 
     ObjectFiller.fill_object(
-        data=incoming_data,
         fill_function=service_create_item_position,
         response=response,
         reference="Item Position",

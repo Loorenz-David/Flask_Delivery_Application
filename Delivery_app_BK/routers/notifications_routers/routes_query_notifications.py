@@ -1,4 +1,5 @@
 from flask import request
+from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from . import notifications_bp
 from Delivery_app_BK.routers.utils.response import Response
@@ -7,42 +8,48 @@ from Delivery_app_BK.models.managers.object_searcher import FindObjects
 
 
 @notifications_bp.route("/query_email_smtp", methods=["POST"])
+@jwt_required()
 def query_email_smtp():
-    response = Response()
-    incoming_data = request.get_json()
+    identity = get_jwt_identity()
+    incoming_data = request.get_json(silent=True)
+    response = Response(incoming_data=incoming_data, identity=identity)
 
     FindObjects.find_objects(
         response=response,
         Model=EmailSMTP,
-        incoming_data=incoming_data,
+        identity=identity,
     )
 
     return response.build()
 
 
 @notifications_bp.route("/query_twilio_mod", methods=["POST"])
+@jwt_required()
 def query_twilio_mod():
-    response = Response()
-    incoming_data = request.get_json()
+    identity = get_jwt_identity()
+    incoming_data = request.get_json(silent=True)
+    response = Response(incoming_data=incoming_data, identity=identity)
 
     FindObjects.find_objects(
         response=response,
         Model=TwilioMod,
-        incoming_data=incoming_data,
+        identity=identity,
     )
 
     return response.build()
 
 
 @notifications_bp.route("/query_message_template", methods=["POST"])
+@jwt_required()
 def query_message_template():
-    response = Response()
-    incoming_data = request.get_json()
+    identity = get_jwt_identity()
+    incoming_data = request.get_json(silent=True)
+    response = Response(incoming_data=incoming_data, identity=identity)
 
     FindObjects.find_objects(
         response=response,
         Model=MessageTemplates,
-        incoming_data=incoming_data,
+        identity=identity,
     )
 
     return response.build()

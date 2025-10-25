@@ -6,9 +6,9 @@ from Delivery_app_BK.models.managers.object_validators import ValueValidator
 
 
 
-def service_update_item( data:dict ):
+def service_update_item( data:dict, identity=None ):
 
-    item_obj:Item = GetObject.get_object( Item,data.get( 'id' ) ) 
+    item_obj:Item = GetObject.get_object( Item,data.get( 'id' ), identity=identity ) 
 
     fields:dict = data.get( "fields" )
     for field, value in fields.items():
@@ -22,7 +22,8 @@ def service_update_item( data:dict ):
                 column = column,
                 value = value,
                 target_model = ItemState,
-                record_column = 'item_state_record'
+                record_column = 'item_state_record',
+                identity=identity
                 )
 
             if not link:
@@ -36,7 +37,8 @@ def service_update_item( data:dict ):
                 column = column,
                 value = value,
                 target_model = ItemPosition,
-                record_column = 'item_position_record'
+                record_column = 'item_position_record',
+                identity=identity
             )
             if not link:
                 raise Exception(f" Something went wrong updating the column item_position_id on model Item")
@@ -47,7 +49,8 @@ def service_update_item( data:dict ):
             link = item_obj.update_link(
                 column = column,
                 value = value,
-                target_model = ItemProperty
+                target_model = ItemProperty,
+                identity=identity
             )
             if not link:
                 raise Exception(f" Something went wrong updating the column item_position_id on model Item")
