@@ -2,19 +2,19 @@ import pytest
 import logging
 
 
-test_category = {"name": "Seating"}
-test_type = {"name": "Dining Chair"}
-test_properties = {"name": "Set Of", "value": "4", "field_type":"number-keyboard"}
-test_state = {"name": "In Transit"}
-test_position = {"name": "Aisle 3"}
-test_item = {
+test_category ={"data": {"name": "Seating"}}
+test_type ={"data": {"name": "Dining Chair"}}
+test_properties ={"data": {"name": "Set Of", "value": "4", "field_type":"number-keyboard"}}
+test_state ={"data": {"name": "In Transit"}}
+test_position ={"data": {"name": "Aisle 3"}}
+test_item ={"data": {
         'article_number': '030303',
         'item_type_id': 1,
         'item_category_id':1,
         'properties':[1],
         'item_state_id':1,
         'item_position_id':1
-    }
+    }}
 
 # CREATE ItemState Instance
 def test_create_item_state(client, auth_headers):

@@ -41,9 +41,10 @@ class Order(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     delivery_after = Column(String)
     delivery_before = Column(String)
 
+    stop_time = Column(String)
+    in_range = Column(Boolean)
     # the order placement when being deliver
     delivery_arrangement = Column(Integer,nullable=True)
-    delivery_polyline = Column(Text)
 
     route_id = Column(Integer,ForeignKey("Route.id"), nullable=True)
 
@@ -79,9 +80,15 @@ class Route(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     actual_start_time = Column(String)
     actual_end_time = Column(String)
 
+    set_start_time = Column(String)
+    set_end_time = Column(String)
+
     start_location = Column(JSONB().with_variant(JSON, "sqlite"))
     end_location = Column(JSONB().with_variant(JSON, "sqlite"))
 
+    
+    using_optimization_indx = Column(Integer)
+    saved_optimizations = Column(JSONB().with_variant(JSON, "sqlite"))
     # Foreign keys
     state_id = Column(Integer,ForeignKey("RouteState.id"))
     

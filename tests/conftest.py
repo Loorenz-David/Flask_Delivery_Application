@@ -37,8 +37,10 @@ def auth_user(app):
 @pytest.fixture
 def auth_headers(client, auth_user):
     res = client.post("/auth/login", json={
-        "email": auth_user["email"],
-        "password": auth_user["password"],
+        "data":{
+            "email": auth_user["email"],
+            "password": auth_user["password"]
+            }
     })
     data = res.get_json()
     token = data["data"]["access_token"]

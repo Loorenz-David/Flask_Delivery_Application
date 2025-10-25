@@ -84,10 +84,11 @@ def create_item ():
 @item_bp.route("/create_item_state", methods=["POST"])
 @jwt_required()
 def create_item_state():
+    print('in create item state')
     identity = get_jwt_identity()
     incoming_data = request.get_json(silent=True)
     response = Response(incoming_data=incoming_data, identity=identity)
-
+    print(response.incoming_data)
     ObjectFiller.fill_object(
         fill_function=service_create_item_state,
         response=response,

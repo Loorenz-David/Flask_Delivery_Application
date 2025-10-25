@@ -32,7 +32,7 @@ class User(db.Model,  ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     email = Column(String,nullable=False)
     password = Column(String,nullable=False)
 
-    role_id = Column(Integer, ForeignKey("UserRole.id"))
+    role_id = Column(Integer, ForeignKey("UserRoles.id"))
 
 
     team = relationship(
@@ -41,7 +41,7 @@ class User(db.Model,  ObjectObtainer, ObjectUpdator, TeamScopedMixin):
         lazy=True
     )
     
-    team = relationship(
+    role = relationship(
         "UserRole", 
         backref="users", 
         lazy=True
@@ -50,8 +50,8 @@ class User(db.Model,  ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     def hash_password(self,password):
         return generate_password_hash(password)
     
-    def get_password(self):
-        return check_password_hash(self.password)
+    def check_password(self,password):
+        return check_password_hash(self.password,password)
 
 
 class UserRole(db.Model,  ObjectObtainer, ObjectUpdator, TeamScopedMixin):
@@ -80,4 +80,3 @@ class UserWarehouse(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
         backref="ware_houses", 
         lazy=True
     )
-

@@ -22,6 +22,7 @@ token_generation_bp = Blueprint("token_generation_bp",__name__)
 def login():
     incoming_data = request.get_json(silent=True)
     response = Response(incoming_data=incoming_data)
+    
     if response.error:
         return response.build()
 
@@ -50,7 +51,7 @@ def login():
         if not user:
             raise Exception("Incorrect loging information")
         
-        if not user.get_password() == password:
+        if not user.check_password(password):
             raise Exception("Incorrect loging information")
         
         # generates access token ( default: expires in 1 hour ). 
@@ -75,6 +76,7 @@ def login():
         response.set_message(message=str(e))
         response.set_error(message=str(e))
 
+        
         return response.build()
     
 

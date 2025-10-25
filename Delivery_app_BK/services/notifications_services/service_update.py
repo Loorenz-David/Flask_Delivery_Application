@@ -1,6 +1,6 @@
 from typing import Dict, Any
 
-from Delivery_app_BK.models.tables.notifications_models import EmailSMTP, TwilioMod, MessageTemplates
+from Delivery_app_BK.models.tables.notifications_models import EmailSMTP, TwilioMod, MessageTemplate
 from Delivery_app_BK.models.tables.users_models import Team
 from Delivery_app_BK.models.managers.object_searcher import GetObject
 from Delivery_app_BK.models.managers.object_inspector import ColumnInspector
@@ -53,12 +53,12 @@ def service_update_twilio_mod(data: dict, identity=None) -> dict:
 
 
 def service_update_message_template(data: dict, identity=None) -> dict:
-    message_template = GetObject.get_object(MessageTemplates, data.get("id"), identity=identity)
+    message_template = GetObject.get_object(MessageTemplate, data.get("id"), identity=identity)
     fields = data.get("fields", {})
     relationship_map = {
         "team_id": Team,
         "team": Team,
     }
 
-    _update_instance(MessageTemplates, message_template, fields, relationship_map, identity=identity)
+    _update_instance(MessageTemplate, message_template, fields, relationship_map, identity=identity)
     return {"status": "ok", "instance": message_template}

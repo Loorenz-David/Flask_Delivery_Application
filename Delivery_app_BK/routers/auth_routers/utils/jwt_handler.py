@@ -7,16 +7,19 @@ jwt = JWTManager()
 def missing_token_callback(error):
     response = Response()
     response.set_error(message="Missing Authorization Header", status=401)
+
     return response.build()
 
 @jwt.invalid_token_loader
 def invalid_token_callback(error):
     response = Response()
     response.set_error(message="Invalid token", status=422)
+    print(response.error)
     return response.build()
 
 @jwt.expired_token_loader
 def expired_token_callback(jwt_header, jwt_payload):
     response = Response()
     response.set_error(message="Token has expired", status=401)
+
     return response.build()

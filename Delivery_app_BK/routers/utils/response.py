@@ -3,11 +3,11 @@ import json, gzip, base64
 
 # object use for returning the router request to the front end
 class Response:
-    def __init__(self, status=200, short_message="", error="", payload=None, incoming_data=None, identity=None):
+    def __init__(self, status=200, short_message="", error=None, payload=None, incoming_data=None, identity=None):
         self.status: int = status
         self.short_message: str = short_message
         self.error: str = error
-        self.payload = payload if payload is not None else []
+        self.payload = payload if payload is not None else {}
         self.is_compress: bool = False
         self.incoming_data = self.decompress_request(incoming_data)
         self.identity = identity or {}
@@ -43,23 +43,38 @@ class Response:
 
         try:
             if not isinstance(incoming_data, dict):
-                return incoming_data
+                raise ValueError("resquest data must be in dict form with format:",
+                                 """
+                                    {
+                                        "data": { } / []
+                                        "is_compress: false / true
+                                    }
+                                """
+                                 )
+                
+            data = incoming_data.get('data',None)
+            if data is None:
+                raise ValueError("resquest data must be in dict form with format:",
+                                 """
+                                    {
+                                        "data": { } / []
+                                        "is_compress: false / true
+                                    }
+                                """
+                                 )
 
             is_compress = incoming_data.get("is_compress", False)
             if not is_compress:
-                return incoming_data.get("data", incoming_data)
+                return data
 
-            compressed_payload = incoming_data.get("data")
-            if compressed_payload is None:
-                raise ValueError("Missing compressed data payload")
-
-            compressed_bytes = base64.b64decode(compressed_payload)
+            compressed_bytes = base64.b64decode(data)
             json_bytes = gzip.decompress(compressed_bytes)
 
             return json.loads(json_bytes.decode("utf-8"))
 
         except Exception as e:
-            self.set_error(f"decompression failed: {str(e)}", 500)
+            self.set_message("Fail to proccess data")
+            self.set_error(f"Fail to proccess data: {str(e)}", 400)
             return None
 
     def compress_payload(self):
@@ -80,6 +95,7 @@ class Response:
             self.is_compress = True
         
         except Exception as e:
-            self.set_error(f"Compression failed: {str(e)}", 500)
+            self.set_message("Error when compressing data.")
+            self.set_error(f"Compression failed: {str(e)}", 400)
         
         return self

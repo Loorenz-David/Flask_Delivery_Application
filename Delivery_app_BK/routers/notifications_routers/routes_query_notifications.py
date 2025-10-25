@@ -3,7 +3,7 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from . import notifications_bp
 from Delivery_app_BK.routers.utils.response import Response
-from Delivery_app_BK.models.tables.notifications_models import EmailSMTP, TwilioMod, MessageTemplates
+from Delivery_app_BK.models.tables.notifications_models import EmailSMTP, TwilioMod, MessageTemplate
 from Delivery_app_BK.models.managers.object_searcher import FindObjects
 
 
@@ -48,7 +48,7 @@ def query_message_template():
 
     FindObjects.find_objects(
         response=response,
-        Model=MessageTemplates,
+        Model=MessageTemplate,
         identity=identity,
     )
 

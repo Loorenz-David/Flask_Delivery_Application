@@ -2,7 +2,7 @@ import base64
 import gzip
 import json
 
-from Delivery_app_BK.models import EmailSMTP, MessageTemplates, TwilioMod
+from Delivery_app_BK.models import EmailSMTP, MessageTemplate, TwilioMod
 
 
 def compress_payload(payload: dict) -> dict:
@@ -51,7 +51,7 @@ def seed_twilio_config(client, app, headers) -> TwilioMod:
         return config
 
 
-def seed_message_template(client, app, headers, name: str = "Welcome") -> MessageTemplates:
+def seed_message_template(client, app, headers, name: str = "Welcome") -> MessageTemplate:
     res = client.post(
         "/notifications/create_message_template",
         json={
@@ -63,7 +63,7 @@ def seed_message_template(client, app, headers, name: str = "Welcome") -> Messag
     )
     assert res.status_code == 200
     with app.app_context():
-        template = MessageTemplates.query.filter_by(name=name).first()
+        template = MessageTemplate.query.filter_by(name=name).first()
         assert template is not None
         return template
 
@@ -76,7 +76,7 @@ def test_create_notification_resources(client, app, auth_headers):
     with app.app_context():
         assert EmailSMTP.query.get(email_config.id) is not None
         assert TwilioMod.query.get(twilio_config.id) is not None
-        assert MessageTemplates.query.get(template.id) is not None
+        assert MessageTemplate.query.get(template.id) is not None
 
 
 def test_update_email_smtp_supports_compressed_payload(client, app, auth_headers):

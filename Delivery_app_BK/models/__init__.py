@@ -22,4 +22,4 @@ from .tables.deliveries_models import Order
 from .tables.deliveries_models import Route
 from .tables.notifications_models import EmailSMTP
 from .tables.notifications_models import TwilioMod
-from .tables.notifications_models import MessageTemplates
+from .tables.notifications_models import MessageTemplate

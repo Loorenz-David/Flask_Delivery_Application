@@ -1,6 +1,6 @@
 # Third-party dependecies
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy import Column, Integer, String, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, ForeignKey, JSON, Boolean
 from sqlalchemy.orm import relationship
 from Delivery_app_BK.models import db
 
@@ -22,6 +22,7 @@ item_property_association = db.Table(
     Column("property_id",Integer,ForeignKey("ItemProperty.id"),primary_key=True)
 )
 
+# add the ability to select the item intention, so if the item is for pick up or delivery 
 
 class Item(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     __tablename__ = "Item"
@@ -35,6 +36,8 @@ class Item(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     item_state_id = Column(Integer, ForeignKey("ItemState.id"))
     item_position_id = Column(Integer, ForeignKey("ItemPosition.id"))
     order_id = Column(Integer, ForeignKey("Order.id"))
+
+    in_range = Column(Boolean)
 
     # Access through relationship links
     item_type = relationship(
@@ -124,7 +127,7 @@ class ItemProperty(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     options = Column(JSONB().with_variant(JSON, "sqlite"))
     
 
-    types = db.relationship(
+    item_types = db.relationship(
         "ItemType",
         secondary=type_property_association,
         back_populates="properties"
