@@ -51,9 +51,9 @@ class MessageTemplate(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     __tablename__ = "MessageTemplate"
 
     id = Column(Integer, primary_key=True)
-    content = Column(Text, nullable=False)
-    name = Column(String, nullable=False)
-    channel = Column(String, nullable=False)
+    content = Column(Text, nullable=False, index=True)
+    name = Column(String, nullable=False, index=True)
+    channel = Column(String, nullable=False, index=True)
     
     team = relationship(
         "Team", 

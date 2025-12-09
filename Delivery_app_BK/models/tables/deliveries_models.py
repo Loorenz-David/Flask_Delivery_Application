@@ -22,9 +22,9 @@ class Order(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     __tablename__ = "Order"
 
     id = Column(Integer, primary_key=True)
-    client_first_name = Column(String, nullable=False)
-    client_last_name = Column(String, nullable=False)
-    client_email = Column(String, nullable=False)
+    client_first_name = Column(String, nullable=False, index=True)
+    client_last_name = Column(String, nullable=False, index=True)
+    client_email = Column(String, nullable=False, index=True)
     client_primary_phone = Column(JSONB().with_variant(JSON, "sqlite")) #{prefix, number}
     client_secondary_phone = Column(JSONB().with_variant(JSON, "sqlite")) #{prefix, number}
     client_address = Column(JSONB().with_variant(JSON, "sqlite"))  # dict: {city, street_address, postal_code, building_floor, coordinates }
@@ -90,8 +90,8 @@ class Route(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     __tablename__ = "Route"
 
     id = Column(Integer, primary_key=True)
-    route_label = Column(String, nullable=False)
-    delivery_date = Column(DateTime(timezone=True),default=lambda: datetime.now(timezone.utc))
+    route_label = Column(String, nullable=False, index=True)
+    delivery_date = Column(DateTime(timezone=True),default=lambda: datetime.now(timezone.utc), index=True)
 
     driver_id = Column(Integer,ForeignKey("User.id")) # Replace with ForeignKey(User.id) 
    
@@ -147,7 +147,7 @@ class RouteState(db.Model,ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     __tablename__ = "RouteState"
 
     id = Column(Integer, primary_key=True)
-    name = Column(String)
+    name = Column(String, index=True)
 
     team = relationship(
         "Team", 
