@@ -19,16 +19,9 @@ action_type_map ={
 
 """
 {
-    "sms":{
-        "template_id": id
-        "target_clients": [ { id: id, target_address: sms, info_for_filling_template... } ]
-    }
-
-    "email":{
-        "template_id": id
-    }
+    "templates_id": { "email": id, "sms": id },
+    "target_clients":[{...single order dict...}]
 }
-
 """
 
 class ObjectNotificator:
@@ -43,8 +36,10 @@ class ObjectNotificator:
         self.identity:dict = identity or getattr(response, "identity", None)
         
         incoming_data:dict = response.incoming_data or {}
-        self.sms_messages:dict = incoming_data.get('sms',None)
-        self.email_messages:dict = incoming_data.get('email',None)
+        self.templates_id:dict = incoming_data.get('templates_id',{}) or {}
+        self.target_clients:list = incoming_data.get('target_clients',[]) or []
+        self.has_email: bool = isinstance(self.templates_id.get('email', None), int)
+        self.has_sms: bool = isinstance(self.templates_id.get('sms', None), int)
 
         self.fail_email_messages = []
         self.successful_email_messages = []
@@ -64,30 +59,24 @@ class ObjectNotificator:
 
             tasks = []
 
-            if self.email_messages:
+            if self.has_email:
                 tasks.append(self.send_email_messages())
             
-            if self.sms_messages:
+            if self.has_sms:
                 tasks.append(self.send_sms_messages())
             
             if tasks:
                 await asyncio.gather(*tasks)
             
-            if not self.email_messages and not self.sms_messages:
-                raise ValueError("no sms or email key in request",
-                                 "to send messages, one must provide a dictionary with keys pointing to the type channel",
-                                 "Example:",
-                                 """{
-                                        "sms":{
-                                            "template_id": id
-                                            "target_clients": [ { id: id, target_address: sms, info_for_filling_template... } ]
-                                        }
-
-                                        "email":{
-                                            "template_id": id
-                                        }
-                                    }"""
-                                 )
+            if not self.has_email and not self.has_sms:
+                raise ValueError(
+                    "No template ids provided.",
+                    "Payload must include templates_id with 'email' and/or 'sms' keys.",
+                    """{
+                        "templates_id": { "email": id, "sms": id },
+                        "target_clients": [{...}]
+                    }"""
+                )
 
 
         
@@ -120,7 +109,7 @@ class ObjectNotificator:
         self.build_message_report()
 
         self.response.set_payload(self.message_report)
-        self.response.compress_payload()
+        # self.response.compress_payload()
 
     async def send_email_messages(self):
 
@@ -130,8 +119,8 @@ class ObjectNotificator:
 
         required_auth, message_template, target_clients = self.set_up_auth(
             AuthModel = EmailSMTP,
-            template_id = self.email_messages.get( 'template_id', None ),
-            target_clients = self.email_messages.get( 'target_clients', None ),
+            template_id = self.templates_id.get('email', None),
+            target_clients = self.target_clients,
             action = 'emails'
         )
 
@@ -156,8 +145,8 @@ class ObjectNotificator:
 
         required_auth, message_template, target_clients = self.set_up_auth(
             AuthModel = TwilioMod,
-            template_id = self.sms_messages.get( 'template_id', None ),
-            target_clients = self.sms_messages.get( 'target_clients', None ),
+            template_id = self.templates_id.get('sms', None),
+            target_clients = self.target_clients,
             action = 'sms'
         )
 
@@ -176,7 +165,7 @@ class ObjectNotificator:
         team_id = self.identity.get( 'team_id', None )
 
         # validates there is list of targets and template id is of type 'int'
-        if not isinstance(target_clients,list):
+        if not isinstance(target_clients,list) or len(target_clients) == 0:
             raise ValueError(f"Missing to pass a list of dictionaries 'target clients'.",
                                 "Each  client dictionary must have:",
                                 " * the client id as found in db, ",
@@ -204,13 +193,13 @@ class ObjectNotificator:
 
     def build_message_report(self):
 
-        if self.sms_messages:
+        if self.has_sms:
             self.message_report['sms'] = {
                 'sent_sms': self.successful_sms_messages,
                 'fail_sms': self.fail_sms_messages
             }
 
-        if self.email_messages:
+        if self.has_email:
             self.message_report['email'] = {
                 'sent_emails': self.successful_email_messages,
                 'fail_emails': self.fail_email_messages
@@ -219,4 +208,3 @@ class ObjectNotificator:
 
 
     
-

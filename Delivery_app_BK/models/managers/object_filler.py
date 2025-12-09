@@ -1,4 +1,4 @@
-from typing import Any, Callable, TYPE_CHECKING
+from typing import Any, Callable, TYPE_CHECKING, List
 import traceback
 from marshmallow import ValidationError
 
@@ -24,7 +24,7 @@ class ObjectFiller:
         reference: str,
         add_to_session=True,
         action_type='create'
-    ) -> bool:
+    ) -> List[Any] | None:
         try:
             if response.error:
                 return False
@@ -69,7 +69,7 @@ class ObjectFiller:
                 db.session.commit()
                 response.set_message(f"{reference} {action_type_map[action_type][0]} successfully")
 
-            return True
+            return objs
         
         # Except blocks
         except ValueError as e:
@@ -108,7 +108,7 @@ class ObjectFiller:
             response.set_error(message=str(e), status=500)
             response.set_message(f"Failed to {action_type_map[action_type][0]} {reference}")
             
-        return False
+        return None
     
 
    

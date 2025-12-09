@@ -6,5 +6,6 @@ from . import (
     routes_create_notifications,
     routes_update_notifications,
     routes_query_notifications,
-    routes_send_notifications
+    routes_send_notifications,
+    routes_delete_notifications
 )  # noqa: E402,F401

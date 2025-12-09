@@ -6,6 +6,10 @@ import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
+from flask_cors import CORS
+
+
+
 
 
 # Local application imports 
@@ -30,6 +34,9 @@ def create_app(config_name="development"):
     # app configuration
     app.config.from_object(config_map.get(config_name))
 
+    frontend_origin = os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173")
+    CORS(app, resources={r"/*": {"origins": frontend_origin}}, supports_credentials=True)
+
     # init app object
     db.init_app(app)
     jwt.init_app(app)
@@ -41,8 +48,12 @@ def create_app(config_name="development"):
         with app.app_context():
             db.create_all()
 
+            
+
     return app
 
 
 # app variable
 app = create_app()
+
+

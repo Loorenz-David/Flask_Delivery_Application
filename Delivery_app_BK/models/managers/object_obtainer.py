@@ -2,6 +2,7 @@
 from typing import List, Dict, Any, Optional, Set
 
 from sqlalchemy.orm.collections import InstrumentedList
+from datetime import datetime, date, time
 
 
 
@@ -56,7 +57,8 @@ class ObjectObtainer:
                         raise Exception(f"passed duplicate column in list: {column}")
 
                     set_of_observations.add(column)
-                    unpack_data[column] = getattr(self, column)
+                    value = getattr(self, column)
+                    unpack_data[column] = self._serialize_value(value)
         else:
             raise Exception(f"columns passed must be wrap in list: [ <-- {columns_to_unpack} --> ] ")
 
@@ -81,6 +83,10 @@ class ObjectObtainer:
             target_relation = getattr(self, key)
             set_of_observations.add(key)
 
+            if target_relation is None:
+                unpack_data[key] = None
+                continue
+
             # If the relation is a list (one-to-many/many-to-many)
             if isinstance(target_relation, InstrumentedList):
                 list_of_relations = []
@@ -91,3 +97,12 @@ class ObjectObtainer:
             else:
                 # Single related object (one-to-one/many-to-one)
                 unpack_data[key] = target_relation.to_dict(values)
+
+    def _serialize_value(self, value: Any) -> Any:
+        if isinstance(value, datetime):
+            return value.isoformat()
+        if isinstance(value, date):
+            return value.isoformat()
+        if isinstance(value, time):
+            return value.isoformat()
+        return value

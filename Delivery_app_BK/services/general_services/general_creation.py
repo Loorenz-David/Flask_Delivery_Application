@@ -22,7 +22,8 @@ def create_general_object(
     fields: dict,
     Model: Type[Model],
     relationship_map: dict | None = None,
-    identity=None
+    identity=None,
+    skip_team_check = False
 ) -> dict : 
     
     # Ensure relationship_map is a valid dict
@@ -30,16 +31,22 @@ def create_general_object(
         relationship_map = {}
     
     processed_fields = dict(fields)
-    if model_requires_team(Model):
-        processed_fields = inject_team_id(processed_fields, identity)
+   
 
+    if not skip_team_check:
+        if model_requires_team(Model):
+            processed_fields = inject_team_id(processed_fields, identity)
+
+    
     # Creates an instance with the given model
     new_item = Model()
-    
+
+
+
     
 
     for field, value in processed_fields.items():
-        
+
         if field == 'id':
             continue
 
@@ -53,6 +60,7 @@ def create_general_object(
         # if the column holds a foreign key, it will link using the foreign key
         if column_inspect.is_foreign_key():
             parent_model = relationship_map.get( column_inspect.column_name )
+            
             if parent_model is None and column_inspect.column_name == "team_id":
                 parent_model = Team
             link = ObjectLinker(
@@ -60,7 +68,8 @@ def create_general_object(
                 child_model = Model,
                 parent = value,
                 parent_model = parent_model,
-                identity=identity
+                identity=identity,
+                skip_team_check = skip_team_check
             ).link_using_foreign_key( column_inspect )
             
             if not link:
@@ -70,17 +79,20 @@ def create_general_object(
         
         # if the column is a relationship, it will link using relationship_props
         elif column_inspect.is_relationship():
+           
             parent_model = relationship_map.get( column_inspect.column_name )
-
+           
             # if it's a list (many-to-many)
             if isinstance(value,list):
                 for parent_id in value:
+
                     link = ObjectLinker(
                         child = new_item,
                         child_model = Model,
                         parent = parent_id,
                         parent_model = parent_model,
-                        identity=identity
+                        identity=identity,
+                        skip_team_check = skip_team_check
                     ).link_using_relationship( column_inspect )
             else:
                 # one-to-one or many-to-one
@@ -89,15 +101,17 @@ def create_general_object(
                         child_model = Model,
                         parent = value,
                         parent_model = parent_model,
-                        identity=identity
+                        identity=identity,
+                        skip_team_check = skip_team_check
                     ).link_using_relationship( column_inspect )
             continue
 
         # if is just a column in the table then a value validation is preform before assigment
+
         valid_value = ValueValidator.is_valid_value(value,column_inspect.column_type)
 
         setattr(new_item, column_inspect.column_name, valid_value)
         
-   
+
     
     return {"status":"ok", "instance":new_item}

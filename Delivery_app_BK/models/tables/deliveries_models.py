@@ -1,8 +1,9 @@
 # Third-party dependecies
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Index, text, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime,Text
-from sqlalchemy import JSON
+
 from datetime import datetime, timezone
 
 # Local application imports
@@ -21,12 +22,15 @@ class Order(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     __tablename__ = "Order"
 
     id = Column(Integer, primary_key=True)
-    client_name = Column(String, nullable=False)
-    client_phones = Column(String)
-    client_address = Column(JSONB().with_variant(JSON, "sqlite"))  # dict: { street_address, postal_code, building_floor, coordinates }
+    client_first_name = Column(String, nullable=False)
+    client_last_name = Column(String, nullable=False)
+    client_email = Column(String, nullable=False)
+    client_primary_phone = Column(JSONB().with_variant(JSON, "sqlite")) #{prefix, number}
+    client_secondary_phone = Column(JSONB().with_variant(JSON, "sqlite")) #{prefix, number}
+    client_address = Column(JSONB().with_variant(JSON, "sqlite"))  # dict: {city, street_address, postal_code, building_floor, coordinates }
     client_language = Column(String,nullable=True)
 
-    notes_chat = Column(JSONB().with_variant(JSON, "sqlite"))  # list
+    notes_chat = Column(JSONB().with_variant(JSON, "sqlite"))  # list [ {timestamp: y/m/d-h:m, message:str, sender:id, seenBy:[ids]} ]
 
     expected_arrival_time = Column(String)
     actual_arrival_time = Column(String)
@@ -34,6 +38,8 @@ class Order(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     # upon_purchase_message = Column(Boolean, default=False)
     # expected_arrival_time_message = Column(Boolean, default=False)
     # upon_completion_message = Column(Boolean, default=False)
+
+  
     
     marketing_messages = Column(Boolean, default=False)
 
@@ -46,12 +52,14 @@ class Order(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     # the order placement when being deliver
     delivery_arrangement = Column(Integer,nullable=True)
 
-    route_id = Column(Integer,ForeignKey("Route.id"), nullable=True)
+    route_id = Column(Integer,ForeignKey("Route.id", ondelete="CASCADE"), nullable=True)
 
     delivery_items = db.relationship(
         "Item", 
-        backref="orders", 
-        lazy=True
+        backref="order", 
+        lazy=True,
+        cascade="all, delete-orphan",
+        passive_deletes=True
     )
 
     team = relationship(
@@ -60,6 +68,19 @@ class Order(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
         lazy=True
     )
     
+    __table_args__ = (
+        # JSONB GIN indexes
+        Index("ix_order_client_primary_phone_gin", client_primary_phone, postgresql_using="gin"),
+        Index("ix_order_client_secondary_phone_gin", client_secondary_phone, postgresql_using="gin"),
+        Index("ix_order_client_address_gin", client_address, postgresql_using="gin"),
+
+        # Full-text index for partial string search
+        Index(
+            "ix_order_client_address_tsvector",
+            text("to_tsvector('simple', client_address::text)"),
+            postgresql_using="gin"
+    ),
+)
     
     
     
@@ -73,7 +94,7 @@ class Route(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     delivery_date = Column(DateTime(timezone=True),default=lambda: datetime.now(timezone.utc))
 
     driver_id = Column(Integer,ForeignKey("User.id")) # Replace with ForeignKey(User.id) 
-
+   
 
     expected_start_time = Column(String)
     expected_end_time = Column(String)
@@ -85,7 +106,7 @@ class Route(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
 
     start_location = Column(JSONB().with_variant(JSON, "sqlite"))
     end_location = Column(JSONB().with_variant(JSON, "sqlite"))
-
+    arrival_time_range = Column(Integer)
     
     using_optimization_indx = Column(Integer)
     saved_optimizations = Column(JSONB().with_variant(JSON, "sqlite"))
@@ -99,7 +120,8 @@ class Route(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
         "Order",
         backref="routes",
         order_by="Order.delivery_arrangement",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
+        passive_deletes=True
     )
 
     route_state = relationship(

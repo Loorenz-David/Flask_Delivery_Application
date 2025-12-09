@@ -1,6 +1,7 @@
 from flask_jwt_extended import JWTManager
 from Delivery_app_BK.routers.utils.response import Response
 
+
 jwt = JWTManager()
 
 @jwt.unauthorized_loader
@@ -12,6 +13,8 @@ def missing_token_callback(error):
 
 @jwt.invalid_token_loader
 def invalid_token_callback(error):
+
+    print(error)
     response = Response()
     response.set_error(message="Invalid token", status=422)
     print(response.error)

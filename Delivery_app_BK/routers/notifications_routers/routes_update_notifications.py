@@ -1,5 +1,6 @@
 from flask import request
-from flask_jwt_extended import get_jwt_identity, jwt_required
+from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
+
 
 from . import notifications_bp
 from Delivery_app_BK.routers.utils.response import Response
@@ -14,7 +15,7 @@ from Delivery_app_BK.services import (
 @notifications_bp.route("/update_email_smtp", methods=["PUT"])
 @jwt_required()
 def update_email_smtp():
-    identity = get_jwt_identity()
+    identity = get_jwt()
     incoming_data = request.get_json(silent=True)
     response = Response(incoming_data=incoming_data, identity=identity)
 
@@ -32,7 +33,7 @@ def update_email_smtp():
 @notifications_bp.route("/update_twilio_mod", methods=["PUT"])
 @jwt_required()
 def update_twilio_mod():
-    identity = get_jwt_identity()
+    identity = get_jwt()
     incoming_data = request.get_json(silent=True)
     response = Response(incoming_data=incoming_data, identity=identity)
 
@@ -50,7 +51,7 @@ def update_twilio_mod():
 @notifications_bp.route("/update_message_template", methods=["PUT"])
 @jwt_required()
 def update_message_template():
-    identity = get_jwt_identity()
+    identity = get_jwt()
     incoming_data = request.get_json(silent=True)
     response = Response(incoming_data=incoming_data, identity=identity)
 

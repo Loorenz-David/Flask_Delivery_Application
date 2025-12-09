@@ -29,7 +29,8 @@ def service_create_item_category(fields:dict, identity=None) -> dict:
 # CREATE ItemType Instance
 def service_create_item_type(fields:dict, identity=None) -> dict:
     rel_map = {
-        'properties':ItemProperty
+        'properties':ItemProperty,
+        'item_category_id':ItemCategory,
     }
 
     return create_general_object(fields, ItemType,rel_map, identity=identity)
@@ -38,7 +39,7 @@ def service_create_item_type(fields:dict, identity=None) -> dict:
 # CREATE ItemProperty Instance
 def service_create_item_property(fields:dict, identity=None) -> dict:
     rel_map = {
-        'types':ItemType,
+        'item_types':ItemType,
         "items":Item
     }
 

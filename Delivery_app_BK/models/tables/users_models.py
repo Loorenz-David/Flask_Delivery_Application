@@ -2,7 +2,7 @@
 # Thirs-party dependencies
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, JSON
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, JSON, Float
 from datetime import datetime,timezone
 
 # Local application imports
@@ -29,11 +29,11 @@ class User(db.Model,  ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     __tablename__ = "User"
     id = Column(Integer,primary_key=True)
     username = Column(String,nullable=False)
-    email = Column(String,nullable=False)
+    email = Column(String,nullable=False, unique=True)
     password = Column(String,nullable=False)
-
+    phone_number = Column(JSONB().with_variant(JSON, "sqlite"))
     role_id = Column(Integer, ForeignKey("UserRoles.id"))
-
+    profile_picture = Column(JSONB().with_variant(JSON, "sqlite"))
 
     team = relationship(
         "Team", 
@@ -73,10 +73,29 @@ class UserWarehouse(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
 
-    location = Column(JSONB().with_variant(JSON, "sqlite"))  # dict: { street_address, postal_code, building_floor, coordinates }
+    location = Column(JSONB().with_variant(JSON, "sqlite"))  # dict: {city, street_address, postal_code, building_floor, coordinates }
 
     team = relationship(
         "Team", 
         backref="ware_houses", 
         lazy=True
+    )
+
+
+class UserVehicle(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
+    __tablename__ = "UserVehicles"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+    icon = Column(String, nullable=True)
+    travel_mode = Column(JSONB().with_variant(JSON, "sqlite"))
+    cost_per_hour = Column(Float, default=0)
+    cost_per_kilometer = Column(Float, default=0)
+    travel_duration_limit = Column(Integer)
+    route_distance_limit = Column(Integer)
+
+    team = relationship(
+        "Team",
+        backref="vehicles",
+        lazy=True,
     )

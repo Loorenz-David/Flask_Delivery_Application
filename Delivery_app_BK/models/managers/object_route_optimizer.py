@@ -1,6 +1,7 @@
 import os
 from datetime import datetime, time as time_cls, timezone
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
+import pprint
 
 from google.api_core.client_options import ClientOptions
 from google.maps import routeoptimization_v1
@@ -8,9 +9,27 @@ from google.protobuf.json_format import MessageToDict
 
 from Delivery_app_BK.models import db, Route, Order
 from Delivery_app_BK.models.managers.object_searcher import GetObject
+from Delivery_app_BK.models import UserVehicle  # type: ignore
+
 
 if TYPE_CHECKING:
     from Delivery_app_BK.routers.utils.response import Response
+
+DEFAULT_ROUTE_MODIFIERS = {
+    "avoid_tolls": False,
+    "avoid_highways": False,
+    "avoid_ferries": False,
+    "avoid_indoor": False,
+}
+
+DEFAULT_VEHICLE_VALUES = {
+    "cost_per_kilometer": 1.0,
+    "travel_mode": "DRIVING",
+}
+
+DEFAULT_OBJECTIVES = [
+    {"type":{"MIN_TRAVEL_TIME": True}},
+]
 
 class GoogleRouteOptimizationClient:
     """
@@ -20,31 +39,24 @@ class GoogleRouteOptimizationClient:
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
         project_id: Optional[str] = None,
         location: Optional[str] = None,
     ) -> None:
-        api_key = api_key or os.environ.get("GOOGLE_ROUTE_OPTIMIZATION_API_KEY")
-        project_id = project_id or os.environ.get("GOOGLE_ROUTE_OPTIMIZATION_PROJECT_ID")
-        location = location or os.environ.get("GOOGLE_ROUTE_OPTIMIZATION_LOCATION", "global")
 
-        if not api_key:
-            raise EnvironmentError("GOOGLE_ROUTE_OPTIMIZATION_API_KEY is not configured.")
+        project_id = project_id or os.environ.get("GOOGLE_ROUTE_OPTIMIZATION_PROJECT_ID")
+        location = location or os.environ.get("GOOGLE_ROUTE_OPTIMIZATION_LOCATION", "us-central1")
+
         if not project_id:
             raise EnvironmentError("GOOGLE_ROUTE_OPTIMIZATION_PROJECT_ID is not configured.")
 
-        client_options = ClientOptions(api_key=api_key)
-        self.parent = f"projects/{project_id}/locations/{location}"
-        self.client = routeoptimization_v1.RouteOptimizationClient(
-            client_options=client_options
-        )
+        self.parent = f"projects/{project_id}"
+        self.client = routeoptimization_v1.RouteOptimizationClient()
 
-    def optimize(self, request: Dict[str, Any],consider_route_traffic = False):
+    def optimize(self, request: Dict[str, Any]):
         """
         Calls the OptimizeTours RPC using the provided fleet model payload.
         """
         request['parent'] = self.parent
-
         return self.client.optimize_tours(request=request)
 
 
@@ -92,6 +104,7 @@ class ObjectRouteOptimizer:
                 route_id = None
         self.route_id:int = route_id
         self.consider_traffic = self.incoming_data.get('consider_traffic',False)
+        self.apply_side_of_road = bool(self.incoming_data.get('side_of_road'))
         
 
         self.route: Optional[Route] = None
@@ -107,7 +120,7 @@ class ObjectRouteOptimizer:
         self.total_duration = 0
         self.polylines_by_order = {}
         self.position = 0
-        self.sequence = []
+        self.sequence = {}
         self.skipped_summary = []
         
 
@@ -120,8 +133,23 @@ class ObjectRouteOptimizer:
             self._load_route()
             self._apply_route_overrides()
             self._apply_order_overrides()
-            
+
+            # incoming_data_example = {
+            #     "route_id": 42,
+            #     "consider_traffic": True,
+            #     "side_of_road": True,
+            #     "vehicle_id": 7,
+            #     "route_modifiers": {
+            #         "avoid_tolls": False,
+            #         "avoid_highways": False,
+            #         "avoid_ferries": False,
+            #         "avoid_indoors": False,
+            #     },
+            #     "objectives": [{"type":{"MIN_TRAVEL_TIME": True}}],
+            # }
+
             model_payload = self._build_request_model()
+       
             api_response = self.google_client.optimize(model_payload)
 
             self._apply_optimizer_response(api_response)
@@ -136,14 +164,14 @@ class ObjectRouteOptimizer:
         
 
     def _extract_shipment_label(self,obj:dict):
-        raw_label:str = obj.get("shipment_label")
+        raw_label:str = obj.get("shipment_label") or obj.get('label')
         if raw_label:
             split = raw_label.split('-')
             return split[0]
         return raw_label
     
 
-    # reviewing if need it....
+    # # reviewing if need it....
     # def refresh_route_details(self, saved_route_indx = -1 ):
     #     """Refreshes route geometry and timing without re-optimizing."""
     #     last_opt = None
@@ -192,11 +220,46 @@ class ObjectRouteOptimizer:
                 setattr(self.route, field, self.incoming_data[field])
 
         self.route_start_time_iso = self._resolve_datetime_string(
-            self.route.set_start_time or self.route.expected_start_time
+            self.route.set_start_time
         )
         self.route_end_time_iso = self._resolve_datetime_string(
-            self.route.set_end_time or self.route.expected_end_time
+            self.route.set_end_time 
         )
+        self._apply_delivery_date_defaults()
+
+    def _apply_delivery_date_defaults(self):
+        if not getattr(self.route, "delivery_date", None):
+            return
+        delivery_date = self.route.delivery_date
+        base_dt: Optional[datetime] = None
+        if isinstance(delivery_date, datetime):
+            base_dt = delivery_date
+        else:
+            parsed = str(delivery_date).strip()
+            if parsed:
+                try:
+                    base_dt = datetime.fromisoformat(parsed)
+                except ValueError:
+                    base_dt = None
+        if not base_dt:
+            return
+        if base_dt.tzinfo is None:
+            base_dt = base_dt.replace(tzinfo=timezone.utc)
+        base_dt = base_dt.astimezone(timezone.utc)
+
+        if not self.route_start_time_iso:
+            start_dt = datetime.combine(
+                base_dt.date(),
+                time_cls(hour=0, minute=0, second=0, tzinfo=timezone.utc),
+            )
+            self.route_start_time_iso = start_dt.isoformat().replace("+00:00", "Z")
+
+        if not self.route_end_time_iso:
+            end_dt = datetime.combine(
+                base_dt.date(),
+                time_cls(hour=23, minute=59, second=59, tzinfo=timezone.utc),
+            )
+            self.route_end_time_iso = end_dt.isoformat().replace("+00:00", "Z")
 
     # Correction, this could run at the same time as creating the request_build
     def _apply_order_overrides(self):
@@ -266,6 +329,7 @@ class ObjectRouteOptimizer:
             model["global_start_time"] = self.route_start_time_iso
         if self.route_end_time_iso:
             model["global_end_time"] = self.route_end_time_iso
+       
         request["model"] = model
 
         partial_reoptimize = self.incoming_data.get("partial_reoptimize")
@@ -278,19 +342,36 @@ class ObjectRouteOptimizer:
                 )
                 request["interpret_injected_solutions_using_labels"] = bool(interpret_labels)
         
-        
-        request['consider_road_traffic'] = self.consider_traffic
+        request["populate_transition_polylines"] = True
+
 
         return request
+
+    def _build_objectives(self) -> List[Dict[str, Any]]:
+        raw_objectives = self.incoming_data.get("objectives")
+        if isinstance(raw_objectives, list) and raw_objectives:
+            return raw_objectives
+        if isinstance(raw_objectives, dict):
+            return [raw_objectives]
+        return list(DEFAULT_OBJECTIVES)
 
     def _build_shipment(self, order: Order) -> Dict[str, Any]:
         coords = self._coordinates_from_location(order.client_address)
         if not coords:
             raise ValueError(f"Order {order.id} is missing coordinates.")
 
-        delivery: Dict[str, Any] = {
-            "arrival_location": {"lat_lng": coords},
+        arrival_location = dict(coords)
+        way_point = {
+            "location": {'lat_lng':arrival_location}
         }
+        if self.apply_side_of_road:
+            way_point["side_of_road"] = True
+
+        delivery: Dict[str, Any] = {
+            "arrival_waypoint": way_point,
+        }
+        
+        
 
         duration_seconds = self.order_stop_seconds.get(order.id)
         if duration_seconds:
@@ -312,25 +393,88 @@ class ObjectRouteOptimizer:
         if not start:
             raise ValueError("Route is missing a valid start_location with coordinates.")
         end = self._coordinates_from_location(self.route.end_location) or start
+        vehicle_template = self._resolve_vehicle_template()
         vehicle: Dict[str, Any] = {
             "display_name": f"vehicle-route-{self.route.id}-{self.route.route_label}",
             "label": f"{self.route.id}-{self.route.route_label}",
-            "start_location": {"lat_lng": start},
-            "end_location": {"lat_lng": end},
+            "start_location": start,
+            "end_location": end,
         }
 
-        if self.route_start_time_iso or self.route_end_time_iso:
-            window: Dict[str, Any] = {}
-            if self.route_start_time_iso:
-                window["start_time"] = self.route_start_time_iso
-            if self.route_end_time_iso:
-                window["end_time"] = self.route_end_time_iso
-            vehicle["start_time_windows"] = [window]
+        # if self.route_start_time_iso or self.route_end_time_iso:
+        #     window: Dict[str, Any] = {}
+        #     if self.route_start_time_iso:
+        #         window["start_time"] = self.route_start_time_iso
+        #     if self.route_end_time_iso:
+        #         window["end_time"] = self.route_end_time_iso
+        #     vehicle["start_time_windows"] = [window]
 
-        if self.route_end_time_iso:
-            vehicle["end_time_windows"] = [{"end_time": self.route_end_time_iso}]
+        # if self.route_end_time_iso:
+        #     vehicle["end_time_windows"] = [{"end_time": self.route_end_time_iso}]
+
+        vehicle["cost_per_kilometer"] = vehicle_template.get(
+            "cost_per_kilometer", DEFAULT_VEHICLE_VALUES["cost_per_kilometer"]
+        )
+        vehicle["travel_mode"] = vehicle_template.get("travel_mode", DEFAULT_VEHICLE_VALUES["travel_mode"])
+        
+        overrides = {}
+
+        for key in ("display_name", "label", "start_location", "end_location"):
+            if vehicle_template.get(key):
+                overrides[key] = vehicle_template[key]
+        vehicle.update(overrides)
+        vehicle["route_modifiers"] = self._resolve_route_modifiers(vehicle_template.get("route_modifiers"))
 
         return vehicle
+
+    def _resolve_vehicle_template(self) -> Dict[str, Any]:
+        template = dict(DEFAULT_VEHICLE_VALUES)
+        template["route_modifiers"] = dict(DEFAULT_ROUTE_MODIFIERS)
+
+        vehicle_id = self.incoming_data.get("vehicle_id")
+        vehicle_instance = None
+        if vehicle_id is not None:
+            try:
+                vehicle_instance = GetObject.get_object(UserVehicle, vehicle_id, identity=self.identity)
+            except Exception:
+                vehicle_instance = None
+
+        if vehicle_instance:
+            template.update(self._coerce_vehicle_record(vehicle_instance))
+
+        return template
+
+    def _coerce_vehicle_record(self, vehicle_instance: Any) -> Dict[str, Any]:
+        allowed_keys = {
+            "display_name",
+            "label",
+            "start_location",
+            "end_location",
+            "cost_per_kilometer",
+            "fixed_cost",
+            "travel_mode",
+            "route_modifiers",
+        }
+        resolved: Dict[str, Any] = {}
+        for key in allowed_keys:
+            if hasattr(vehicle_instance, key):
+                value = getattr(vehicle_instance, key)
+                if value is not None:
+                    resolved[key] = value
+        return resolved
+
+    def _resolve_route_modifiers(self, base: Optional[Dict[str, Any]] = None) -> Dict[str, bool]:
+        modifiers = dict(DEFAULT_ROUTE_MODIFIERS)
+        if isinstance(base, dict):
+            for key, value in base.items():
+                if key in modifiers:
+                    modifiers[key] = bool(value)
+        incoming = self.incoming_data.get("route_modifiers")
+        if isinstance(incoming, dict):
+            for key, value in incoming.items():
+                if key in modifiers:
+                    modifiers[key] = bool(value)
+        return modifiers
 
     def _coordinates_from_location(self, location: Optional[Dict[str, Any]]):
         if not location:
@@ -469,7 +613,11 @@ class ObjectRouteOptimizer:
         return self._seconds_from_duration(value) or 0
 
     def _apply_optimizer_response(self, api_response):
-        response_dict = MessageToDict(api_response, preserving_proto_field_name=True)
+
+        message = getattr(api_response, "_pb", api_response)
+        response_dict = MessageToDict(message, preserving_proto_field_name=True)
+
+
         routes = response_dict.get("routes", [])
         if not routes:
             raise ValueError("Route Optimization API returned no routes.")
@@ -487,6 +635,7 @@ class ObjectRouteOptimizer:
        
         # extracts the shipments that where skipped
         skipped = response_dict.get("skipped_shipments", [])
+
         self._extract_skipped_shipments(skipped)
        
 
@@ -509,7 +658,7 @@ class ObjectRouteOptimizer:
         self.route.expected_end_time = expected_end or self.route.expected_end_time
         self.route.is_optimized = True
 
-        route_saved_optimizations = self.route.saved_optimizations or []
+        route_saved_optimizations = list(self.route.saved_optimizations or []) 
         self.skipped_shipments = self.skipped_summary
         self.optimization_summary = {
             "total_distance_meters": self.total_distance,
@@ -526,11 +675,15 @@ class ObjectRouteOptimizer:
             "consider_traffic":self.consider_traffic
         }
         route_saved_optimizations.append(self.optimization_summary)
+        if len(route_saved_optimizations) > 3:
+            route_saved_optimizations = route_saved_optimizations[-3:]
         self.route.saved_optimizations = route_saved_optimizations
-        self.route.using_optimization_indx = len(route_saved_optimizations) - 1
+        self.route.using_optimization_indx = len(route_saved_optimizations) - 1 
+
 
    
     def _extract_transitions(self, transitions, visits ):
+
 
         for idx, transition in enumerate(transitions):
            
@@ -548,7 +701,7 @@ class ObjectRouteOptimizer:
             elif isinstance(route_polyline, str):
                 trans_polyline = route_polyline
             
-
+            
             if idx == 0:
                 # First transition: from start to first order
                 self.polylines_by_order["start"] = trans_polyline
@@ -573,14 +726,17 @@ class ObjectRouteOptimizer:
                             pass
             else:
                 # Transition from visits[idx] to visits[idx+1]
-                if len(visits) > idx + 1:
-                    next_label = self._extract_shipment_label(visits[idx + 1])
+                if len(visits) > idx :
+
+                    next_label = self._extract_shipment_label(visits[idx])
+
                     if next_label:
                         try:
                             next_id = int(next_label)
                             self.polylines_by_order[str(next_id)] = trans_polyline
                         except Exception:
                             pass
+
         
     def _extract_visits(self, visits):
         for idx, visit in enumerate(visits):
@@ -595,19 +751,23 @@ class ObjectRouteOptimizer:
             if not order:
                 continue
 
-            self.sequence.append(order_id)
+            
             order.delivery_arrangement = self.position
+            sequence_obj = { "delivery_arrangement": self.position, "in_range":True }
             order.in_range = True
             self.position += 1
             arrival_time = visit.get("arrival_time") or visit.get("start_time")
+            sequence_obj['expected_arrival_time'] = arrival_time
             if arrival_time:
                 order.expected_arrival_time = arrival_time
+
+            self.sequence[order_id] = sequence_obj
             # Do NOT set order.delivery_polyline here
 
     def _extract_skipped_shipments(self, skipped):
         skipped_position = self.position
-        
         for shipment in skipped:
+
             shipment_label = self._extract_shipment_label(shipment)
             if not shipment_label:
                 continue
@@ -624,7 +784,7 @@ class ObjectRouteOptimizer:
             order.expected_arrival_time = None
             skipped_entry = {
                 "order_id": order_id,
-                "reason": shipment.get("reason", "UNSPECIFIED"),
+                "reason": shipment.get("reasons", "UNSPECIFIED"),
             }
             self.skipped_summary.append(skipped_entry)
 
@@ -640,33 +800,31 @@ class ObjectRouteOptimizer:
             "start_location": self.route.start_location,
             "end_location": self.route.end_location,
             "is_optimized": self.route.is_optimized,
-            "polyline": self.optimization_summary.get("polyline"),
+            'saved_optimizations':self.optimization_summary,
+            'using_optimization_indx':self.route.using_optimization_indx,
+            "delivery_orders": [self._serialize_order(order) for order in self.orders]
+
         }
 
     def _serialize_order(self, order: Order) -> Dict[str, Any]:
         return {
             "id": order.id,
-            "client_name": order.client_name,
-            "client_address": order.client_address,
             "delivery_arrangement": order.delivery_arrangement,
             "expected_arrival_time": order.expected_arrival_time,
             "stop_time": order.stop_time,
             "in_range": order.in_range,
-            "delivery_polyline": order.delivery_polyline,
         }
 
     def _commit_and_set_payload(self):
+
         db.session.add(self.route)
         db.session.add_all(self.orders)
         db.session.commit()
 
         payload = {
             "route": self._serialize_route(),
-            "orders": [self._serialize_order(order) for order in self.orders],
-            "skipped_shipments": self.skipped_shipments,
-            "summary": self.optimization_summary,
         }
 
         self.response.set_payload(payload)
         self.response.set_message("Route optimized successfully.")
-        self.response.compress_payload()
+        # self.response.compress_payload()

@@ -3,7 +3,7 @@
 # Third-part dependencies
 from flask import Blueprint, request
 from marshmallow import ValidationError
-from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity
+from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt
 
 
 # Local application imports 
@@ -22,6 +22,7 @@ token_generation_bp = Blueprint("token_generation_bp",__name__)
 def login():
     incoming_data = request.get_json(silent=True)
     response = Response(incoming_data=incoming_data)
+
     
     if response.error:
         return response.build()
@@ -48,6 +49,7 @@ def login():
         # query for user and pasword match check
         query = User.query
         user:User = query.filter(User.email == email).first()
+       
         if not user:
             raise Exception("Incorrect loging information")
         
@@ -57,9 +59,10 @@ def login():
         # generates access token ( default: expires in 1 hour ). 
         # generates refresh token ( default: expires in 7 days ). 
         # to change this default behaviors modify Delivery_app_BK __init__.py, keys with substrings JWT and EXPIRES
-        identity_data = {"user_id": user.id, "team_id": user.team_id}
-        access_token = create_access_token(identity=identity_data)
-        refresh_token = create_refresh_token(identity=identity_data)
+        identity_data = str(user.id)
+        claims = {"user_id": user.id, "team_id": user.team_id}
+        access_token = create_access_token(identity=identity_data, additional_claims=claims)
+        refresh_token = create_refresh_token(identity=identity_data, additional_claims=claims)
 
         # set the return payload 
         response.set_payload({
@@ -88,7 +91,7 @@ def refresh():
 
     # gets the user id coming from the refresh token,
     # and generates a new access token
-    identity_data = get_jwt_identity()
+    identity_data = get_jwt()
     new_access = create_access_token(identity=identity_data)
 
     # sets the payload for the response

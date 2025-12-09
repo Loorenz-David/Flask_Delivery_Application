@@ -10,9 +10,9 @@ class ObjectLinker:
     and parent are intances by performing a query. if the passed child or parent values are already instances it will just
     return that instance.
     '''
-    def __init__(self,child,child_model,parent,parent_model, identity=None):
+    def __init__(self,child,child_model,parent,parent_model, identity=None, skip_team_check=False):
 
-        self.child = GetObject.get_object(child_model,child, identity=identity)
+        self.child = GetObject.get_object(child_model,child, identity=identity, skip_team_check=skip_team_check )
         self.child_model = child_model
         self.parent = GetObject.get_object(parent_model,parent, identity=identity)
         self.parent_model = parent_model
@@ -34,7 +34,7 @@ class ObjectLinker:
     def link_using_relationship(self,column):
         if not isinstance(column, ColumnInspector):
             column = ColumnInspector(column, self.child_model)
-
+      
         if not column.is_relationship():
             raise Exception(
                 f"'{column.column_name}' is not a valid relationship on {self.child_model.__name__}"

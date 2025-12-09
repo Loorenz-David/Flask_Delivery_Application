@@ -17,23 +17,29 @@ class SMTPMixin:
                 port = self.smtp_port,
                 use_tls = self.use_ssl
             )
+
             await smtp.connect()
-
+  
             # Upgrade to TLS if use_tls is True (STARTTLS)
-            if self.use_tls and not self.use_ssl:
-                await smtp.starttls()
-                
+            # STARTTLS only if requested and supported by the server
+            if self.use_tls and "starttls" in smtp.esmtp_extensions:
+                try:
+                    await smtp.starttls()
+                except Exception as tls_error:
+                    print("STARTTLS failed or already active:", tls_error)
+           
             await smtp.login(self.smtp_username, self.smtp_password_encrypted)
-
+            
             return smtp
         except Exception as e:
+            print(f"SMTP connection failed: {str(e)}")
             raise ConnectionError(f"SMTP verification failed: {str(e)}")
 
 
     def build_message(self:"EmailSMTP", client:dict, message_template:"MessageTemplate"):
         from Delivery_app_BK.models.tables.notifications_models import SafeDict
 
-        client_email = client.get('email')   
+        client_email = client.get('client_email')   
         if client_email is None:
             raise ValueError('Missing eamil.')
         
@@ -42,8 +48,11 @@ class SMTPMixin:
         message["To"] = client_email        
         message["Subject"] = message_template.name     
 
-        template:str = message_template.content     
-        message.set_content(template.format_map(SafeDict(client)))
+        template:str = message_template.content   
+        temp = template.format_map(SafeDict(client))  
+        message.set_content(temp)
+        
+
         return message
     
 
@@ -58,24 +67,25 @@ class SMTPMixin:
         smtp = await self.get_smtp_connection()
 
         for client in target_clients:
-            
-            try: 
-                message = self.build_message(client,message_template)
-
-                client:dict
-                client_response = {
+            client_response = {
                     "id": client.get('id'),
                     'server_message': 'none'
                 }
+            try: 
+
+                message = self.build_message(client,message_template)
+
+                client:dict
+                
 
                 response:str
-                response, _ = await smtp.send_message(message)
+                response, response_message = await smtp.send_message(message)
 
-                if not response.startswith("250"):
-                    client_response['server_message'] = response
+                if not str(response_message).startswith("2."):
+                    client_response['server_message'] = response_message
                     fail_sent_messages.append(client_response)
                 else:
-                    client_response['server_message'] = response
+                    client_response['server_message'] = response_message
                     successful_sent_messages.append(client_response)
 
             except SMTPRecipientsRefused as e:

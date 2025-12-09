@@ -6,7 +6,7 @@ from marshmallow import ValidationError
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.exc import IntegrityError, DataError, OperationalError, ProgrammingError, SQLAlchemyError
 from sqlalchemy.inspection import inspect
-from sqlalchemy import or_, and_
+from sqlalchemy import or_, and_, cast
 from sqlalchemy import Integer, String, Float, Boolean, Date, DateTime
 from flask_sqlalchemy.model import Model
 
@@ -30,28 +30,23 @@ and the operation the filter should perform
 class ObjectSearcher(ActionValidator):
 
     FILTER_MAP = {
-        '==': lambda query, col, val: query.filter(col == val),
-        '!=': lambda query, col, val: query.filter(col != val),
-        '>': lambda query, col, val: query.filter(col > val),
-        '>=': lambda query, col, val: query.filter(col >= val),
-        '<': lambda query, col, val: query.filter(col < val),
-        '<=': lambda query, col, val: query.filter(col <= val),
-        'in': lambda query, col, val: query.filter(col.in_(val if isinstance(val, list) else [val])),
-        'notin': lambda query, col, val: query.filter(~col.in_(val if isinstance(val, list) else [val])),
-        'range': lambda query, col, val: query.filter(col.between(val['start'], val['end'])),
-        'or': lambda query, col, val: query.filter(or_(*[ObjectSearcher.FILTER_MAP[cond['operation']](query, col, cond['value'])._criterion for cond in val if 'operation' in cond and 'value' in cond])),
-        'and': lambda query, col, val: query.filter(and_(*[ObjectSearcher.FILTER_MAP[cond['operation']](query, col, cond['value'])._criterion for cond in val if 'operation' in cond and 'value' in cond])),
-        'contains': lambda query, col, val: query.filter(col.contains(val)),
-        'contained_by': lambda query, col, val: query.filter(col.contained_by(val)),
-        'has_key': lambda query, col, val: query.filter(col.has_key(val)),
-        'has_any': lambda query, col, val: query.filter(col.has_any(val)),
-        'has_all': lambda query, col, val: query.filter(col.has_all(val)),
-
-        # like  is a partial string macth: is "com%" in "coment". the % is used as a wild card. ilike is case sensitive
-        'like': lambda query, col, val: query.filter(col.like(val)),
-
-        # ilike  is a partial string macth: is "com%" in "coment". the % is used as a wild card. ilike is not case sensitive
-        'ilike': lambda query, col, val: query.filter(col.ilike(val)), 
+        '==': lambda col, val: col == val,
+        '!=': lambda col, val: col != val,
+        '>': lambda col, val: col > val,
+        '>=': lambda col, val: col >= val,
+        '<': lambda col, val: col < val,
+        '<=': lambda col, val: col <= val,
+        'in': lambda col, val: col.in_(val if isinstance(val, list) else [val]),
+        'notin': lambda col, val: ~col.in_(val if isinstance(val, list) else [val]),
+        'range': lambda col, val: col.between(val['start'], val['end']),
+        'contains': lambda col, val: col.contains(val),
+        'contained_by': lambda col, val: col.contained_by(val),
+        'has_key': lambda col, val: col.has_key(val),
+        'has_any': lambda col, val: col.has_any(val),
+        'has_all': lambda col, val: col.has_all(val),
+        'like': lambda col, val: col.like(val),
+        'ilike': lambda col, val: col.ilike(val),
+        'json_ilike': lambda col, val: cast(col, String).ilike(val),
     }
 
     def __init__(
@@ -103,33 +98,10 @@ class ObjectSearcher(ActionValidator):
 
         # loop over column, value pairs. each loop adds an _and or an _or filter to the end query
         for column, op in self.query_filters.items():
-            
-            # if '.' in column then client is trying to add a filter through a relationship
-            if '.' in column:
-                query, target_column, operation, value = self.join_relationship_to_query(query, column, op)
-
+            if self.is_or_key(column):
+                query = self.apply_or_group(query, op)
             else:
-                
-                op = self.validate_query_operation( op, column )
-                
-                operation = op['operation']
-                value = op['value']
-
-                # validates column exist in model
-                column = self.has_column( column )
-                # validates the value pass is of same type as column type
-                self.value_has_valid_format(column, value)
-                # sets target
-                target_column = getattr(self.Obj, column)
-
-            if operation not in self.FILTER_MAP:
-                raise ValueError(
-                    f"Invalid filter operation in '{operation}' for column {column}.",
-                )
-                
-            # finds the target operation for query
-            query = self.FILTER_MAP[operation](query, target_column, value)
-
+                query = self.apply_condition(query, column, op)
 
         self.query = query
         return True
@@ -161,12 +133,110 @@ class ObjectSearcher(ActionValidator):
 
         # validate the operation and value
         op = self.validate_query_operation(op, target_col_name)
-        operation = op["operation"]
         value = op["value"]
-        self.value_has_valid_format(target_col_name, value, operation)
+        self.value_has_valid_format(target_col_name, value)
 
-        # return both the updated query and the final column
-        return current_query, target_col, operation, value
+        return current_query, target_col, op
+
+    def apply_condition(self, query, column, definition):
+        query, expression = self.build_condition_expression(query, column, definition)
+        if expression is None:
+            return query
+        return query.filter(expression)
+
+    def build_condition_expression(self, query, column, definition):
+        if self.is_or_key(column):
+            return self.build_or_group_expression(query, definition)
+
+        query, target_column, op = self.resolve_column_definition(query, column, definition)
+        expression = self.build_expression_from_operation(target_column, op)
+        return query, expression
+
+    def resolve_column_definition(self, query, column, definition):
+        column_name = self.strip_or_prefix(column)
+        if isinstance(column_name, str) and '.' in column_name:
+            return self.join_relationship_to_query(query, column_name, definition)
+
+        column_name = self.has_column(column_name)
+        op = self.validate_query_operation(definition, column_name)
+        self.value_has_valid_format(column_name, op['value'])
+        target_column = getattr(self.Obj, column_name)
+        return query, target_column, op
+
+    def build_expression_from_operation(self, target_column, op):
+        operation = op['operation']
+        value = op['value']
+
+        if operation == 'or':
+            expressions = [
+                self.build_expression_from_operation(target_column, condition)
+                for condition in value
+                if isinstance(condition, dict) and 'operation' in condition and 'value' in condition
+            ]
+            expressions = [expr for expr in expressions if expr is not None]
+            if not expressions:
+                return None
+            return or_(*expressions)
+
+        if operation == 'and':
+            expressions = [
+                self.build_expression_from_operation(target_column, condition)
+                for condition in value
+                if isinstance(condition, dict) and 'operation' in condition and 'value' in condition
+            ]
+            expressions = [expr for expr in expressions if expr is not None]
+            if not expressions:
+                return None
+            return and_(*expressions)
+
+        builder = self.FILTER_MAP.get(operation)
+        if not builder:
+            raise ValueError(f"Invalid filter operation in '{operation}' for column.")
+        return builder(target_column, value)
+
+    def apply_or_group(self, query, group_definition):
+        query, expressions = self.collect_group_expressions(query, group_definition)
+        if expressions:
+            query = query.filter(or_(*expressions))
+        return query
+
+    def build_or_group_expression(self, query, definition):
+        query, expressions = self.collect_group_expressions(query, definition)
+        if not expressions:
+            return query, None
+        return query, or_(*expressions)
+
+    def collect_group_expressions(self, query, definition):
+        expressions = []
+        if isinstance(definition, list):
+            for entry in definition:
+                query, child_expressions = self.collect_group_expressions(query, entry)
+                expressions.extend(child_expressions)
+            return query, expressions
+
+        if not isinstance(definition, dict):
+            return query, expressions
+
+        for column, nested in definition.items():
+            if self.is_or_key(column):
+                query, nested_expression = self.build_or_group_expression(query, nested)
+                if nested_expression is not None:
+                    expressions.append(nested_expression)
+            else:
+                stripped = self.strip_or_prefix(column)
+                query, expression = self.build_condition_expression(query, stripped, nested)
+                if expression is not None:
+                    expressions.append(expression)
+
+        return query, expressions
+
+    def is_or_key(self, key):
+        return isinstance(key, str) and key.startswith('or-')
+
+    def strip_or_prefix(self, key):
+        if isinstance(key, str) and key.startswith('or-'):
+            return key[3:]
+        return key
 
 
     # triggers a search on the build query
@@ -222,7 +292,10 @@ class ObjectSearcher(ActionValidator):
             requested_data = self.requested_data
 
         if not self.found_objects:
-            self.response.set_error("No object found to unpack")
+            self.response.set_error(
+                message = "No object found to unpack",
+                status= 200
+            )
             return False
         
         unpacked_data = []
@@ -257,13 +330,14 @@ GetObject is an object that queries on a model by id using db.session.get
 class GetObject:
     
     @staticmethod
-    def get_object(Model,id, identity=None):
-        
+    def get_object(Model,id, identity=None, skip_team_check=False):
+
         if not InstanceValidator.is_sqlalchemy_instance(Model):
             raise Exception
         
         if InstanceValidator.is_sqlalchemy_instance(id):
             obj = id
+            return obj
         else:
             with db.session.no_autoflush:
                 object_query = db.session.get(Model,id)
@@ -271,8 +345,9 @@ class GetObject:
                 raise NoResultFound(f"No {Model.__name__} found with id '{id}'")
             obj = object_query
 
-        if hasattr(obj, "team_id"):
-            ensure_instance_in_team(obj, identity)
+        if not skip_team_check:
+            if hasattr(obj, "team_id") :
+                ensure_instance_in_team(obj, identity)
 
         return obj
 
@@ -360,6 +435,7 @@ class FindObjects:
                 searcher.trigger_query()
 
             count_of_objects_found = searcher.count_of_objects_found
+
             if unpack_data:
                 # unpacks the found object into a dictionary format, if no items where found it will not
                 # raise an error, but it will set the response error message to "no items found" and return an empty list on key items.
@@ -379,7 +455,7 @@ class FindObjects:
                         message = f"no items found",
                         status = 200
                     )
-                    
+                    return False
                 else:
                     response.set_payload({'items':[]})
                     response.set_error(

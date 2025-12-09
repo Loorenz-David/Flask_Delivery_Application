@@ -36,24 +36,29 @@ Back_end/
    pip install Flask Flask-SQLAlchemy Flask-JWT-Extended marshmallow python-dotenv pytest
    ```
 3. **Environment variables**  
-   Copy `.env` (or create it) at the project root with at least:
+   Copy `.env.example` to `.env` and adjust as needed:
    ```dotenv
    FLASK_ENV=development
    SECRET_KEY=devkey
    JWT_SECRET_KEY=change-me
    DATABASE_URL=postgresql://postgres:password@localhost:5432/DeliveryApp
+   FRONTEND_ORIGIN=http://localhost:5173
    ```
-   - `DATABASE_URL` is only used outside of testing; development defaults to the value shown above.
-   - When running tests the app automatically switches to `sqlite:///:memory:`.
+   `FRONTEND_ORIGIN` is used by Flask-CORS so the Vite dev server can hit this API. Set it to the exact origin you'll load the front-end from.
 
 4. **Database**  
    `create_app("development")` will transparently call `db.create_all()` the first time it boots, so an empty PostgreSQL database matching `DATABASE_URL` is enough for local work. Alembic migrations have not been introduced yet.
 
 5. **Run the application**
    ```bash
+   pip install -r requirements.txt
    python run.py
    ```
    Flask will start on `http://127.0.0.1:5000`. The development factory registers all blueprints and wires JWT handlers.
+
+## Working with the Front-end
+
+The React client (in `../Front_end/delivery-app-front`) uses `VITE_API_BASE_URL` to talk to this server and expects CORS to allow `http://localhost:5173`. As long as you keep `FRONTEND_ORIGIN` synced with the URL your Vite dev server runs on, browser requests such as `POST http://127.0.0.1:5000/route/query_route` will succeed after signing in.
 
 ## Auth Workflow
 There is no user-registration route yet. Seed at least one record in the `User` table (manually or via a database client) to exercise the token endpoints.

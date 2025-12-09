@@ -1,5 +1,6 @@
 from flask import request
-from flask_jwt_extended import get_jwt_identity, jwt_required
+from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
+
 
 from . import user_bp
 from Delivery_app_BK.routers.utils.response import Response
@@ -11,19 +12,19 @@ from Delivery_app_BK.services import (
     service_create_user_warehouse,
 )
 
-
 @user_bp.route("/create_user", methods=["POST"])
 @jwt_required()
 def create_user():
-    identity = get_jwt_identity()
+    identity = get_jwt()
     incoming_data = request.get_json(silent=True)
     response = Response(incoming_data=incoming_data, identity=identity)
-
-    ObjectFiller.fill_object(
+    
+    created_instances = ObjectFiller.fill_object(
         fill_function=service_create_user,
         response=response,
         reference="User",
     )
+    response.set_created_payload(created_instances)
 
     return response.build()
 
@@ -31,15 +32,16 @@ def create_user():
 @user_bp.route("/create_team", methods=["POST"])
 @jwt_required()
 def create_team():
-    identity = get_jwt_identity()
+    identity = get_jwt()
     incoming_data = request.get_json(silent=True)
     response = Response(incoming_data=incoming_data, identity=identity)
 
-    ObjectFiller.fill_object(
+    created_instances = ObjectFiller.fill_object(
         fill_function=service_create_team,
         response=response,
         reference="Team",
     )
+    response.set_created_payload(created_instances)
 
     return response.build()
 
@@ -47,15 +49,15 @@ def create_team():
 @user_bp.route("/create_user_role", methods=["POST"])
 @jwt_required()
 def create_user_role():
-    identity = get_jwt_identity()
+    identity = get_jwt()
     incoming_data = request.get_json(silent=True)
     response = Response(incoming_data=incoming_data, identity=identity)
-
-    ObjectFiller.fill_object(
+    created_instances = ObjectFiller.fill_object(
         fill_function=service_create_user_role,
         response=response,
         reference="User Role",
     )
+    response.set_created_payload(created_instances)
 
     return response.build()
 
@@ -63,14 +65,15 @@ def create_user_role():
 @user_bp.route("/create_user_warehouse", methods=["POST"])
 @jwt_required()
 def create_user_warehouse():
-    identity = get_jwt_identity()
+    identity = get_jwt()
     incoming_data = request.get_json(silent=True)
     response = Response(incoming_data=incoming_data, identity=identity)
 
-    ObjectFiller.fill_object(
+    created_instances = ObjectFiller.fill_object(
         fill_function=service_create_user_warehouse,
         response=response,
         reference="User Warehouse",
     )
+    response.set_created_payload(created_instances)
 
     return response.build()

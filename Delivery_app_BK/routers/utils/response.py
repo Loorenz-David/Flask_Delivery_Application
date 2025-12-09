@@ -26,6 +26,34 @@ class Response:
     def set_payload(self,data):
         self.payload = data
         return self
+
+    def set_created_payload(self, instances, fields=None):
+        if not instances:
+            return self
+
+        target_fields = list(fields) if fields else ["id"]
+        payload_entries = []
+        for instance in instances:
+            entry = {}
+            for field in target_fields:
+                if hasattr(instance, field):
+                    value = getattr(instance, field)
+                    if value is not None:
+                        entry[field] = value
+            if not entry and hasattr(instance, "id"):
+                entry = {"id": getattr(instance, "id")}
+            if entry:
+                payload_entries.append(entry)
+
+        if not payload_entries:
+            return self
+
+        if len(payload_entries) == 1:
+            self.set_payload({"instance": payload_entries[0]})
+        else:
+            self.set_payload({"items": payload_entries})
+
+        return self
     
 
     def build(self):

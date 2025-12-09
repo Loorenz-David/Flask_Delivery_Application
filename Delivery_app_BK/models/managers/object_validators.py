@@ -7,6 +7,9 @@ from typing import Any
 from sqlalchemy.orm.exc import UnmappedInstanceError
 from sqlalchemy.exc import NoInspectionAvailable
 
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import JSON
+
 class ActionValidator:
      
     def validate_query( 
@@ -127,7 +130,11 @@ class ValueValidator:
 
         if not column_type:
             raise ValueError(f"No column type was given on is_valid_value")
-        
+
+        # use for JSONB and JSON columns as the type is read as dict in python
+        if column_type is dict :
+            return value
+           
          # Try datetime conversion if type mismatch
         if isinstance(value, str) and column_type is datetime:
             try:
@@ -143,7 +150,9 @@ class ValueValidator:
         
         
 
-        raise Exception(f"the type '{type(value)}' is not supported by column, it must be '{column_type}'")
+        raise Exception(
+            f"The type for value {value}.",
+            f"the type '{type(value)}' is not supported by column, it must be '{column_type}'")
 
 class DataStructureValidators:
 
@@ -164,15 +173,16 @@ class DataStructureValidators:
     def is_valid_update_dict(data:dict, reference,action_type="modify"):
        
         has_id = data.get('id',None)
-        has_fields = data.get('fields',None)
 
         if has_id is None:
             raise ValueError(f"Data is missing an id to find the {reference}")
-        
-        if has_fields is None:
-            raise ValueError(f"Data is missing fields to {action_type} {reference}")
-        
-        if not isinstance(has_fields,dict):
-            raise ValueError(f"Fields must be of type dict, to {action_type} {reference}")
+
+        if action_type != "delete":
+            has_fields = data.get('fields',None)
+            if has_fields is None:
+                raise ValueError(f"Data is missing fields to {action_type} {reference}")
+            
+            if not isinstance(has_fields,dict):
+                raise ValueError(f"Fields must be of type dict, to {action_type} {reference}")
 
         return True
