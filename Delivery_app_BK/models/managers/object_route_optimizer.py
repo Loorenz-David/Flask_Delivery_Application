@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import datetime, time as time_cls, timezone
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
@@ -5,6 +6,7 @@ import pprint
 
 from google.api_core.client_options import ClientOptions
 from google.maps import routeoptimization_v1
+from google.oauth2 import service_account
 from google.protobuf.json_format import MessageToDict
 
 from Delivery_app_BK.models import db, Route, Order
@@ -50,7 +52,12 @@ class GoogleRouteOptimizationClient:
             raise EnvironmentError("GOOGLE_ROUTE_OPTIMIZATION_PROJECT_ID is not configured.")
 
         self.parent = f"projects/{project_id}"
-        self.client = routeoptimization_v1.RouteOptimizationClient()
+
+        if os.environ.get("FLASK_ENVIROMENT") == "development":
+            self.client = routeoptimization_v1.RouteOptimizationClient()
+        else:
+            credentials = service_account.Credentials.from_service_account_info(json.loads(os.environ["GOOGLE_CREDENTIALS_JSON"]))
+            self.client = routeoptimization_v1.RouteOptimizationClient(credentials=credentials)
 
     def optimize(self, request: Dict[str, Any]):
         """
