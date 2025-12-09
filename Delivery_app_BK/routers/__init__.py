@@ -16,3 +16,7 @@ def register_blueprints( app ):
     app.register_blueprint( route_bp, url_prefix="/route" )
     app.register_blueprint( notifications_bp, url_prefix="/notifications" )
     app.register_blueprint( user_bp, url_prefix="/user" )
+
+
+
+

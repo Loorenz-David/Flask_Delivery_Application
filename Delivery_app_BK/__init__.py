@@ -53,7 +53,9 @@ def create_app(config_name="development"):
         #     # db.create_all()
         #     db.drop_all()
 
-            
+    @app.route("/")
+    def health():
+        return {"status": "ok"}, 200
 
     return app
 
