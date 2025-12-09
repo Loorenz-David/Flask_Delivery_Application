@@ -48,8 +48,10 @@ def create_app(config_name="development"):
     register_blueprints(app)
 
     if config_name == 'development':
-        with app.app_context():
-            db.create_all()
+        pass
+        # with app.app_context():
+        #     # db.create_all()
+        #     db.drop_all()
 
             
 
