@@ -10,12 +10,12 @@ from .user_routers import user_bp
 
 # register all existing blueprints and assign url_prefixes
 def register_blueprints( app ):
-    app.register_blueprint( token_generation_bp, url_prefix="/auth" )
-    app.register_blueprint( item_bp, url_prefix="/item" )
-    app.register_blueprint( order_bp, url_prefix="/order" )
-    app.register_blueprint( route_bp, url_prefix="/route" )
-    app.register_blueprint( notifications_bp, url_prefix="/notifications" )
-    app.register_blueprint( user_bp, url_prefix="/user" )
+    app.register_blueprint( token_generation_bp, url_prefix="/api/auth" )
+    app.register_blueprint( item_bp, url_prefix="/api/item" )
+    app.register_blueprint( order_bp, url_prefix="/api/order" )
+    app.register_blueprint( route_bp, url_prefix="/api/route" )
+    app.register_blueprint( notifications_bp, url_prefix="/api/notifications" )
+    app.register_blueprint( user_bp, url_prefix="/api/user" )
 
 
 
