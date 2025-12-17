@@ -148,7 +148,9 @@ class RouteState(db.Model,ObjectObtainer, ObjectUpdator, TeamScopedMixin):
 
     id = Column(Integer, primary_key=True)
     name = Column(String, index=True)
+    color = Column(String)
 
+     # relationships
     team = relationship(
         "Team", 
         backref="route_states", 

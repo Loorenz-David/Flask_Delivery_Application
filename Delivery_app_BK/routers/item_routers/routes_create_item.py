@@ -1,6 +1,7 @@
 # Third-party dependencies
 from flask import request
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
+from Delivery_app_BK.routers.utils.role_decorator import role_required
 
 # Locat Imports
 from Delivery_app_BK.models.managers.object_filler import ObjectFiller
@@ -19,6 +20,7 @@ from Delivery_app_BK.routers.utils.response import Response
 # CREATE ItemCategory Instance
 @item_bp.route("/create_item_category", methods=["POST"])
 @jwt_required()
+@role_required([1])
 def create_item_category():
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)
@@ -35,6 +37,7 @@ def create_item_category():
 # CREATE ItemType Instance
 @item_bp.route("/create_item_type", methods=["POST"])
 @jwt_required()
+@role_required([1])
 def create_item_type():
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)
@@ -52,6 +55,7 @@ def create_item_type():
 # CREATE ItemProperty Instance
 @item_bp.route("/create_item_property", methods=["POST"])
 @jwt_required()
+@role_required([1])
 def create_item_property():
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)
@@ -68,6 +72,7 @@ def create_item_property():
 # CREATE Item Instance
 @item_bp.route("/create_item",methods=['POST'])
 @jwt_required()
+@role_required([1])
 def create_item ():
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)
@@ -86,6 +91,7 @@ def create_item ():
 # CREATE ItemState Instance
 @item_bp.route("/create_item_state", methods=["POST"])
 @jwt_required()
+@role_required([1])
 def create_item_state():
 
     identity = get_jwt()
@@ -105,6 +111,7 @@ def create_item_state():
 # CREATE ItemPosition Instance
 @item_bp.route("/create_item_position", methods=["POST"])
 @jwt_required()
+@role_required([1])
 def create_item_position():
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)

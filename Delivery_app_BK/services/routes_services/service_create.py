@@ -14,6 +14,7 @@ it can me modified on the service function
 
 # CREATE Route Instance 
 def service_create_route(fields:dict, identity=None)->dict:
+
     rel_map = {
         'route_state':RouteState,
         'state_id':RouteState,
@@ -22,3 +23,8 @@ def service_create_route(fields:dict, identity=None)->dict:
         'delivery_orders':Order
     }
     return create_general_object(fields,Route,rel_map, identity=identity)
+
+
+# CREATE RouteState Instance
+def service_create_route_state(fields: dict, identity=None) -> dict:
+    return create_general_object(fields, RouteState, identity=identity)

@@ -1,6 +1,6 @@
 from typing import Dict, Any
 
-from Delivery_app_BK.models.tables.users_models import Team, User, UserRole, UserWarehouse
+from Delivery_app_BK.models.tables.users_models import Team, User, UserRole, UserWarehouse, RoleRules
 from Delivery_app_BK.models.tables.items_models import Item
 from Delivery_app_BK.models.managers.object_searcher import GetObject
 from Delivery_app_BK.models.managers.object_inspector import ColumnInspector
@@ -78,3 +78,16 @@ def service_update_user_warehouse(data: dict, identity=None) -> dict:
 
     _update_instance(UserWarehouse, warehouse, fields, relationship_map, identity=identity)
     return {"status": "ok", "instance": warehouse}
+
+
+def service_update_role_rule(data: dict, identity=None) -> dict:
+    instance = GetObject.get_object(RoleRules, data.get("id"), identity=identity)
+    fields = data.get("fields", {})
+    relationship_map = {
+        "team_id": Team,
+        "team": Team,
+        "role_id": UserRole,
+        "role": UserRole,
+    }
+    _update_instance(RoleRules, instance, fields, relationship_map, identity=identity)
+    return {"status": "ok", "instance": instance}

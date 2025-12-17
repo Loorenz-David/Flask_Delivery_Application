@@ -1,5 +1,6 @@
 from flask import request
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
+from Delivery_app_BK.routers.utils.role_decorator import role_required
 
 
 from . import user_bp
@@ -14,6 +15,7 @@ from Delivery_app_BK.services import (
 
 @user_bp.route("/create_user", methods=["POST"])
 @jwt_required()
+@role_required([1])
 def create_user():
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)
@@ -31,6 +33,7 @@ def create_user():
 
 @user_bp.route("/create_team", methods=["POST"])
 @jwt_required()
+@role_required([1])
 def create_team():
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)
@@ -48,6 +51,7 @@ def create_team():
 
 @user_bp.route("/create_user_role", methods=["POST"])
 @jwt_required()
+@role_required([1])
 def create_user_role():
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)
@@ -64,6 +68,7 @@ def create_user_role():
 
 @user_bp.route("/create_user_warehouse", methods=["POST"])
 @jwt_required()
+@role_required([1])
 def create_user_warehouse():
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)

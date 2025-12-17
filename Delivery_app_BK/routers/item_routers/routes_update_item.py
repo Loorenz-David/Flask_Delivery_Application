@@ -1,6 +1,7 @@
 # Third-party dependencies
 from flask import request
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
+from Delivery_app_BK.routers.utils.role_decorator import role_required
 
 from Delivery_app_BK.models.managers.object_filler import ObjectFiller
 from Delivery_app_BK.services import (
@@ -17,6 +18,7 @@ from Delivery_app_BK.routers.utils.response import Response
 # CREATE Item Instance
 @item_bp.route("/update_item",methods=['PUT'])
 @jwt_required()
+@role_required([1,2,3])
 def update_item ():
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)
@@ -35,6 +37,7 @@ def update_item ():
 
 @item_bp.route("/update_item_category", methods=['PUT'])
 @jwt_required()
+@role_required([1])
 def update_item_category():
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)
@@ -53,11 +56,11 @@ def update_item_category():
 
 @item_bp.route("/update_item_type", methods=['PUT'])
 @jwt_required()
+@role_required([1])
 def update_item_type():
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)
     response = Response(incoming_data=incoming_data, identity=identity)
-
     ObjectFiller.fill_object(
         response=response,
         fill_function=service_update_item_type,
@@ -71,6 +74,7 @@ def update_item_type():
 
 @item_bp.route("/update_item_property", methods=['PUT'])
 @jwt_required()
+@role_required([1])
 def update_item_property():
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)
@@ -89,6 +93,7 @@ def update_item_property():
 
 @item_bp.route("/update_item_state", methods=['PUT'])
 @jwt_required()
+@role_required([1])
 def update_item_state():
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)
@@ -107,6 +112,7 @@ def update_item_state():
 
 @item_bp.route("/update_item_position", methods=['PUT'])
 @jwt_required()
+@role_required([1])
 def update_item_position():
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)

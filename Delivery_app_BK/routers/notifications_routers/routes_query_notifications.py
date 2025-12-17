@@ -1,5 +1,6 @@
 from flask import request
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
+from Delivery_app_BK.routers.utils.role_decorator import role_required
 
 
 from . import notifications_bp
@@ -13,6 +14,7 @@ from .notifications_default_data_request import (
 
 @notifications_bp.route("/query_message_template", methods=["POST"])
 @jwt_required()
+@role_required([1, 2])
 def query_message_template():
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)
@@ -35,6 +37,7 @@ def query_message_template():
 
 @notifications_bp.route("/are_services_active", methods=["GET"])
 @jwt_required()
+@role_required([1, 2])
 def are_services_active():
     identity = get_jwt()
     response = Response(identity=identity)

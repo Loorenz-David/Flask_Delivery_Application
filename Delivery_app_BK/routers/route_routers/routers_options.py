@@ -1,4 +1,5 @@
 from flask_jwt_extended import jwt_required, get_jwt
+from Delivery_app_BK.routers.utils.role_decorator import role_required
 
 from . import route_bp
 from Delivery_app_BK.routers.utils.response import Response
@@ -65,6 +66,7 @@ def _normalize_route_states(states):
 
 @route_bp.route('/main_dependencies', methods=['GET'])
 @jwt_required()
+@role_required([1, 2, 3])
 def query_route_main_dependencies():
   identity = get_jwt()
   response = Response(identity=identity)

@@ -1,5 +1,6 @@
 from flask import request
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
+from Delivery_app_BK.routers.utils.role_decorator import role_required
 
 
 from . import route_bp
@@ -12,6 +13,7 @@ from Delivery_app_BK.services.routes_services.service_optimize import (
 
 @route_bp.route("/optimize_route", methods=["POST"])
 @jwt_required()
+@role_required([1, 2, 3])
 def optimize_route():
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)
@@ -25,6 +27,7 @@ def optimize_route():
 
 @route_bp.route("/change_optimization_indx", methods=["POST"])
 @jwt_required()
+@role_required([1, 2, 3])
 def change_optimization_indx():
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)

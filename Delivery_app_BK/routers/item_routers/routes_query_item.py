@@ -1,6 +1,7 @@
 # Third-party dependencies
 from flask import request
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
+from Delivery_app_BK.routers.utils.role_decorator import role_required
 
 
 # Locat Imports
@@ -22,6 +23,7 @@ from Delivery_app_BK.services.item_services.service_query_options import service
 
 @item_bp.route("/query_item",methods=['POST'])
 @jwt_required()
+@role_required([1, 2])
 def query_item ():
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)
@@ -43,6 +45,7 @@ def query_item ():
 
 @item_bp.route("/query_item_options", methods=['POST'])
 @jwt_required()
+@role_required([1, 2])
 def query_item_options():
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)
@@ -61,6 +64,7 @@ def query_item_options():
 
 @item_bp.route("/query_item_type", methods=['POST'])
 @jwt_required()
+@role_required([1, 2])
 def query_item_type():
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)
@@ -83,6 +87,7 @@ def query_item_type():
 
 @item_bp.route("/query_item_category", methods=['POST'])
 @jwt_required()
+@role_required([1, 2])
 def query_item_category():
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)
@@ -105,6 +110,7 @@ def query_item_category():
 
 @item_bp.route("/query_item_property", methods=['POST'])
 @jwt_required()
+@role_required([1, 2])
 def query_item_property():
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)
@@ -127,6 +133,7 @@ def query_item_property():
 
 @item_bp.route("/query_item_state", methods=['POST'])
 @jwt_required()
+@role_required([1, 2, 3])
 def query_item_state():
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)
@@ -149,6 +156,7 @@ def query_item_state():
 
 @item_bp.route("/query_item_position", methods=['POST'])
 @jwt_required()
+@role_required([1, 2, 3])
 def query_item_position():
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)

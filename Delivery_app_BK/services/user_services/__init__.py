@@ -7,6 +7,7 @@ from Delivery_app_BK.services.user_services.service_create import (
     service_create_team,
     service_create_user_role,
     service_create_user_warehouse,
+    service_create_user_vehicle,
 )
 from Delivery_app_BK.services.user_services.service_update import (
     service_update_user,
@@ -20,6 +21,7 @@ __all__ = [
     "service_create_team",
     "service_create_user_role",
     "service_create_user_warehouse",
+    "service_create_user_vehicle",
     "service_update_user",
     "service_update_team",
     "service_update_user_role",

@@ -83,8 +83,10 @@ class ObjectFiller:
             response.set_message("Unauthorized")
         except IntegrityError as e:
             db.session.rollback()
-            response.set_error(message=str(e.orig), status=400)
-            response.set_message(f"Integrity error while {action_type_map[action_type][1]} {reference} (e.g., duplicate or FK issue)")
+            readable = response.get_unique_error_message(e)
+            base_message = f"Integrity error while {action_type_map[action_type][1]} {reference} (e.g., duplicate or FK issue)"
+            response.set_error(message=readable or str(e.orig), status=400)
+            response.set_message(readable or base_message)
         except DataError as e:
             db.session.rollback()
             response.set_error(message=str(e.orig), status=400)

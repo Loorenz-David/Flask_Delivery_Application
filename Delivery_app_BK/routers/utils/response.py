@@ -1,5 +1,6 @@
 from flask import jsonify
 import json, gzip, base64
+import re
 
 # object use for returning the router request to the front end
 class Response:
@@ -26,6 +27,33 @@ class Response:
     def set_payload(self,data):
         self.payload = data
         return self
+
+    def get_unique_error_message(self, error: Exception) -> str | None:
+        """
+        Attempt to extract a readable unique-constraint message from a SQL error.
+        Supports common PostgreSQL patterns. Falls back to None if it cannot parse.
+        """
+        raw = ""
+        if hasattr(error, "orig"):
+            try:
+                raw = str(error.orig)
+            except Exception:
+                raw = str(error)
+        else:
+            raw = str(error)
+
+        key_match = re.search(r'Key \(([^)]+)\)=\(([^)]+)\) already exists', raw)
+        if key_match:
+            field = key_match.group(1)
+            value = key_match.group(2)
+            return f"The value '{value}' for '{field}' is already in use. Please choose a different value."
+
+        constraint_match = re.search(r'unique constraint \"([^\"]+)\"', raw, re.IGNORECASE)
+        if constraint_match:
+            constraint = constraint_match.group(1)
+            return f"Duplicate value detected ({constraint}). Please use a different value."
+
+        return None
 
     def set_created_payload(self, instances, fields=None):
         if not instances:

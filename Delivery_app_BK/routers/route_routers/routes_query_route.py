@@ -1,6 +1,7 @@
 # Third-party dependencies
 from flask import request
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
+from Delivery_app_BK.routers.utils.role_decorator import role_required
 
 # Locat Imports
 from . import route_bp
@@ -11,8 +12,9 @@ from Delivery_app_BK.services.routes_services.service_query_routes import servic
 
 @route_bp.route("/query_route",methods=['POST'])
 @jwt_required()
+@role_required([1, 2, 3])
 def query_route ():
-    
+
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)
     response = Response(incoming_data=incoming_data, identity=identity)

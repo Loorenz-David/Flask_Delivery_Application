@@ -1,4 +1,4 @@
-from Delivery_app_BK.models.tables.users_models import Team, User, UserRole, UserWarehouse
+from Delivery_app_BK.models.tables.users_models import Team, User, UserRole, UserWarehouse, UserVehicle, RoleRules
 from Delivery_app_BK.models.tables.items_models import Item
 from Delivery_app_BK.services.general_services.general_creation import create_general_object
 
@@ -34,3 +34,21 @@ def service_create_user_warehouse(fields: dict, identity=None) -> dict:
         "delivery_items": Item,
     }
     return create_general_object(fields, UserWarehouse, rel_map, identity=identity)
+
+
+def service_create_user_vehicle(fields: dict, identity=None) -> dict:
+    rel_map = {
+        "team_id": Team,
+        "team": Team,
+    }
+    return create_general_object(fields, UserVehicle, rel_map, identity=identity)
+
+
+def service_create_role_rule(fields: dict, identity=None) -> dict:
+    rel_map = {
+        "team_id": Team,
+        "team": Team,
+        "role_id": UserRole,
+        "role": UserRole,
+    }
+    return create_general_object(fields, RoleRules, rel_map, identity=identity)

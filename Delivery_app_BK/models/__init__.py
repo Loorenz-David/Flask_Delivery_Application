@@ -13,6 +13,8 @@ from .tables.users_models import Team
 from .tables.users_models import UserRole
 from .tables.users_models import UserWarehouse
 from .tables.users_models import UserVehicle
+from .tables.users_models import TeamInvitesSend
+from .tables.users_models import UserTeamInvitationsReceived
 from .tables.items_models import Item
 from .tables.items_models import ItemType
 from .tables.items_models import ItemCategory

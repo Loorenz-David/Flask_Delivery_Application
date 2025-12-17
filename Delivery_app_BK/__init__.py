@@ -1,3 +1,5 @@
+import eventlet
+eventlet.monkey_patch()
 # Standard library imports
 from datetime import timedelta
 import os
@@ -8,6 +10,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 from flask_migrate import Migrate
+from Delivery_app_BK.socketio_instance import socketio
 
 
 
@@ -41,17 +44,20 @@ def create_app(config_name="development"):
     # init app object
     db.init_app(app)
     jwt.init_app(app)
-
     Migrate(app, db)
+    socketio.init_app(app)
 
     from .routers import register_blueprints
     register_blueprints(app)
 
+    import Delivery_app_BK.sockets.signaling  
+
     if config_name == 'development':
+        
         pass
         # with app.app_context():
-        #     # db.create_all()
-        #     db.drop_all()
+        #     db.create_all()
+            # db.drop_all()
 
     @app.route("/")
     def health():

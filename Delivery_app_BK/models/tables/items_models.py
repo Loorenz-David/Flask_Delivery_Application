@@ -1,6 +1,6 @@
- # Third-party dependecies
+# Third-party dependecies
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy import Column, Integer, String, ForeignKey, JSON, Boolean
+from sqlalchemy import Column, Integer, String, ForeignKey, JSON, Boolean, UniqueConstraint
 from sqlalchemy.orm import relationship
 from Delivery_app_BK.models import db
 
@@ -12,8 +12,8 @@ from Delivery_app_BK.models.mixins.teams_mixings import TeamScopedMixin
 
 type_property_association = db.Table(
     "type_property_association",
-    Column("type_id", Integer, ForeignKey("ItemType.id"), primary_key=True),
-    Column("property_id", Integer, ForeignKey("ItemProperty.id"), primary_key=True)
+    Column("type_id", Integer, ForeignKey("ItemType.id", ondelete="CASCADE"), primary_key=True),
+    Column("property_id", Integer, ForeignKey("ItemProperty.id", ondelete="CASCADE"), primary_key=True)
 )
 
 
@@ -71,10 +71,13 @@ class Item(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
 
 class ItemType(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     __tablename__ = "ItemType"
+    __table_args__ = (
+        UniqueConstraint("team_id", "name", name="uq_itemtype_team_name"),
+    )
 
     id = Column(Integer, primary_key=True)
-    name = Column(String, unique=True, nullable=False, index=True)
-    item_category_id = Column(Integer, ForeignKey("ItemCategory.id"))
+    name = Column(String, nullable=False, index=True)
+    item_category_id = Column(Integer, ForeignKey("ItemCategory.id", ondelete="RESTRICT"))
 
     item_category = relationship(
         "ItemCategory",
@@ -96,13 +99,18 @@ class ItemType(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
 
 class ItemCategory(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     __tablename__ = "ItemCategory"
+    __table_args__ = (
+        UniqueConstraint("team_id", "name", name="uq_itemcategory_team_name"),
+    )
 
     id = Column(Integer, primary_key=True)
-    name = Column(String, unique=True, nullable=False, index=True)
+    name = Column(String, nullable=False, index=True)
 
     item_types = db.relationship(
         "ItemType",
-        back_populates="item_category"
+        back_populates="item_category",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     team = relationship(
@@ -114,6 +122,9 @@ class ItemCategory(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
 
 class ItemProperty(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     __tablename__ = "ItemProperty"
+    __table_args__ = (
+        UniqueConstraint("team_id", "name", name="uq_itemproperty_team_name"),
+    )
 
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False, index=True)
@@ -139,12 +150,15 @@ class ItemProperty(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
 
 class ItemState(db.Model,ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     __tablename__ = "ItemState"
+    __table_args__ = (
+        UniqueConstraint("team_id", "name", name="uq_itemstate_team_name"),
+    )
 
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False, index=True)
     color = Column(String, nullable=False) 
-    default = Column(Boolean, nullable=False)
-    description = Column(String, nullable=False)
+    default = Column(Boolean, default=False)
+    description = Column(String)
     priority = Column(Integer)
 
     team = relationship(
@@ -159,6 +173,9 @@ class ItemState(db.Model,ObjectObtainer, ObjectUpdator, TeamScopedMixin):
 
 class ItemPosition(db.Model,ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     __tablename__ = "ItemPosition"
+    __table_args__ = (
+        UniqueConstraint("team_id", "name", name="uq_itemposition_team_name"),
+    )
 
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False, index=True)

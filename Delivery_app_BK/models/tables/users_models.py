@@ -3,7 +3,7 @@
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, JSON, Float
-from datetime import datetime,timezone
+from datetime import datetime, timezone
 
 # Local application imports
 from Delivery_app_BK.models import db
@@ -34,7 +34,12 @@ class User(db.Model,  ObjectObtainer, ObjectUpdator, TeamScopedMixin):
     phone_number = Column(JSONB().with_variant(JSON, "sqlite"))
     role_id = Column(Integer, ForeignKey("UserRoles.id"))
     profile_picture = Column(JSONB().with_variant(JSON, "sqlite"))
-
+    old_team_id = Column(Integer, nullable=True)
+    old_role_id = Column(Integer, nullable=True)
+    show_app_tutorial = Column(Boolean, default=True)
+    last_online = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    last_location = Column(JSONB().with_variant(JSON, "sqlite")) # dict: {city, street_address, postal_code, building_floor, coordinates }
+    
     team = relationship(
         "Team", 
         backref="members", 
@@ -54,15 +59,60 @@ class User(db.Model,  ObjectObtainer, ObjectUpdator, TeamScopedMixin):
         return check_password_hash(self.password,password)
 
 
-class UserRole(db.Model,  ObjectObtainer, ObjectUpdator, TeamScopedMixin):
+class TeamInvitesSend(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
+    __tablename__ = "TeamInvitesSend"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("User.id"), nullable=True)
+    username = Column(String, nullable=False)
+    email = Column(String, nullable=False)
+    role_id = Column(Integer, ForeignKey("UserRoles.id"), nullable=True)
+    date = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    team = relationship("Team", lazy=True)
+    user = relationship("User", lazy=True)
+    role = relationship("UserRole", lazy=True)
+
+
+class UserTeamInvitationsReceived(db.Model, ObjectObtainer, ObjectUpdator):
+    __tablename__ = "UserTeamInvitationsReceived"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("User.id"), nullable=False)
+    from_team_id = Column(Integer, ForeignKey("Team.id"), nullable=False)
+    from_team_name = Column(String, nullable=False)
+    role_id = Column(Integer, ForeignKey("UserRoles.id"), nullable=True)
+    date = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    user = relationship("User", lazy=True)
+    from_team = relationship("Team", lazy=True)
+    role = relationship("UserRole", lazy=True)
+
+
+
+class UserRole(db.Model,  ObjectObtainer, ObjectUpdator):
     __tablename__ = "UserRoles"
     id = Column(Integer,primary_key=True)
     role = Column(String,nullable=False, index=True)
-    permisions = Column(JSONB().with_variant(JSON, "sqlite")) 
+    description = Column(String)
+    rules = relationship(
+        "RoleRules", 
+        backref="user_role", 
+        lazy=True
+    )
+
+
+class RoleRules(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
+    __tablename__ = "RoleRules"
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False, index=True)
+    description = Column(String)
+    rule = Column(JSONB().with_variant(JSON, "sqlite"))  # dict: {date_query_range: {from: int, to: int} }
+    role_id = Column(Integer, ForeignKey("UserRoles.id"), index=True)
 
     team = relationship(
         "Team", 
-        backref="roles", 
+        backref="role_rules", 
         lazy=True
     )
 

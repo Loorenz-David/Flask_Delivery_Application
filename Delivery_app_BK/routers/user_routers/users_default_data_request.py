@@ -4,11 +4,11 @@ USER_REQUESTED_DATA = [
     'email',
     'phone_number',
     'profile_picture',
+    'show_app_tutorial',
     {
         'role': [
             'id',
             'role',
-            'permisions',
         ],
     },
     {
@@ -31,7 +31,15 @@ TEAM_REQUESTED_DATA = [
 USER_ROLE_REQUESTED_DATA = [
     'id',
     'role',
-    'permisions',
+    'description',
+    {
+        'rules': [
+            'id',
+            'name',
+            'description',
+            'rule',
+        ],
+    },
 ]
 
 USER_WAREHOUSE_REQUESTED_DATA = [
