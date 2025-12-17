@@ -1,8 +1,8 @@
-"""initial
+"""Inital migration
 
-Revision ID: fa45e16bb0c9
+Revision ID: dbe0a26248b5
 Revises: 
-Create Date: 2025-12-09 16:48:37.372712
+Create Date: 2025-12-17 11:01:58.967418
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = 'fa45e16bb0c9'
+revision = 'dbe0a26248b5'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -28,6 +28,15 @@ def upgrade():
     )
     with op.batch_alter_table('Team', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_Team_name'), ['name'], unique=True)
+
+    op.create_table('UserRoles',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('role', sa.String(), nullable=False),
+    sa.Column('description', sa.String(), nullable=True),
+    sa.PrimaryKeyConstraint('id')
+    )
+    with op.batch_alter_table('UserRoles', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_UserRoles_role'), ['role'], unique=False)
 
     op.create_table('EmailSMTP',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -47,10 +56,11 @@ def upgrade():
     sa.Column('name', sa.String(), nullable=False),
     sa.Column('team_id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['team_id'], ['Team.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('team_id', 'name', name='uq_itemcategory_team_name')
     )
     with op.batch_alter_table('ItemCategory', schema=None) as batch_op:
-        batch_op.create_index(batch_op.f('ix_ItemCategory_name'), ['name'], unique=True)
+        batch_op.create_index(batch_op.f('ix_ItemCategory_name'), ['name'], unique=False)
 
     op.create_table('ItemPosition',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -59,7 +69,8 @@ def upgrade():
     sa.Column('description', sa.String(), nullable=False),
     sa.Column('team_id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['team_id'], ['Team.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('team_id', 'name', name='uq_itemposition_team_name')
     )
     with op.batch_alter_table('ItemPosition', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_ItemPosition_name'), ['name'], unique=False)
@@ -72,7 +83,8 @@ def upgrade():
     sa.Column('required', sa.Boolean(), nullable=False),
     sa.Column('team_id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['team_id'], ['Team.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('team_id', 'name', name='uq_itemproperty_team_name')
     )
     with op.batch_alter_table('ItemProperty', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_ItemProperty_name'), ['name'], unique=False)
@@ -81,12 +93,13 @@ def upgrade():
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(), nullable=False),
     sa.Column('color', sa.String(), nullable=False),
-    sa.Column('default', sa.Boolean(), nullable=False),
-    sa.Column('description', sa.String(), nullable=False),
+    sa.Column('default', sa.Boolean(), nullable=True),
+    sa.Column('description', sa.String(), nullable=True),
     sa.Column('priority', sa.Integer(), nullable=True),
     sa.Column('team_id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['team_id'], ['Team.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('team_id', 'name', name='uq_itemstate_team_name')
     )
     with op.batch_alter_table('ItemState', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_ItemState_name'), ['name'], unique=False)
@@ -105,9 +118,25 @@ def upgrade():
         batch_op.create_index(batch_op.f('ix_MessageTemplate_content'), ['content'], unique=False)
         batch_op.create_index(batch_op.f('ix_MessageTemplate_name'), ['name'], unique=False)
 
+    op.create_table('RoleRules',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('name', sa.String(), nullable=False),
+    sa.Column('description', sa.String(), nullable=True),
+    sa.Column('rule', postgresql.JSONB(astext_type=sa.Text()).with_variant(sa.JSON(), 'sqlite'), nullable=True),
+    sa.Column('role_id', sa.Integer(), nullable=True),
+    sa.Column('team_id', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['role_id'], ['UserRoles.id'], ),
+    sa.ForeignKeyConstraint(['team_id'], ['Team.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    with op.batch_alter_table('RoleRules', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_RoleRules_name'), ['name'], unique=False)
+        batch_op.create_index(batch_op.f('ix_RoleRules_role_id'), ['role_id'], unique=False)
+
     op.create_table('RouteState',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(), nullable=True),
+    sa.Column('color', sa.String(), nullable=True),
     sa.Column('team_id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['team_id'], ['Team.id'], ),
     sa.PrimaryKeyConstraint('id')
@@ -124,16 +153,27 @@ def upgrade():
     sa.ForeignKeyConstraint(['team_id'], ['Team.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_table('UserRoles',
+    op.create_table('User',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('role', sa.String(), nullable=False),
-    sa.Column('permisions', postgresql.JSONB(astext_type=sa.Text()).with_variant(sa.JSON(), 'sqlite'), nullable=True),
+    sa.Column('username', sa.String(), nullable=False),
+    sa.Column('email', sa.String(), nullable=False),
+    sa.Column('password', sa.String(), nullable=False),
+    sa.Column('phone_number', postgresql.JSONB(astext_type=sa.Text()).with_variant(sa.JSON(), 'sqlite'), nullable=True),
+    sa.Column('role_id', sa.Integer(), nullable=True),
+    sa.Column('profile_picture', postgresql.JSONB(astext_type=sa.Text()).with_variant(sa.JSON(), 'sqlite'), nullable=True),
+    sa.Column('old_team_id', sa.Integer(), nullable=True),
+    sa.Column('old_role_id', sa.Integer(), nullable=True),
+    sa.Column('show_app_tutorial', sa.Boolean(), nullable=True),
+    sa.Column('last_online', sa.DateTime(), nullable=True),
+    sa.Column('last_location', postgresql.JSONB(astext_type=sa.Text()).with_variant(sa.JSON(), 'sqlite'), nullable=True),
     sa.Column('team_id', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['role_id'], ['UserRoles.id'], ),
     sa.ForeignKeyConstraint(['team_id'], ['Team.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    with op.batch_alter_table('UserRoles', schema=None) as batch_op:
-        batch_op.create_index(batch_op.f('ix_UserRoles_role'), ['role'], unique=False)
+    with op.batch_alter_table('User', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_User_email'), ['email'], unique=True)
+        batch_op.create_index(batch_op.f('ix_User_username'), ['username'], unique=False)
 
     op.create_table('UserVehicles',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -167,29 +207,13 @@ def upgrade():
     sa.Column('name', sa.String(), nullable=False),
     sa.Column('item_category_id', sa.Integer(), nullable=True),
     sa.Column('team_id', sa.Integer(), nullable=False),
-    sa.ForeignKeyConstraint(['item_category_id'], ['ItemCategory.id'], ),
+    sa.ForeignKeyConstraint(['item_category_id'], ['ItemCategory.id'], ondelete='RESTRICT'),
     sa.ForeignKeyConstraint(['team_id'], ['Team.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('team_id', 'name', name='uq_itemtype_team_name')
     )
     with op.batch_alter_table('ItemType', schema=None) as batch_op:
-        batch_op.create_index(batch_op.f('ix_ItemType_name'), ['name'], unique=True)
-
-    op.create_table('User',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('username', sa.String(), nullable=False),
-    sa.Column('email', sa.String(), nullable=False),
-    sa.Column('password', sa.String(), nullable=False),
-    sa.Column('phone_number', postgresql.JSONB(astext_type=sa.Text()).with_variant(sa.JSON(), 'sqlite'), nullable=True),
-    sa.Column('role_id', sa.Integer(), nullable=True),
-    sa.Column('profile_picture', postgresql.JSONB(astext_type=sa.Text()).with_variant(sa.JSON(), 'sqlite'), nullable=True),
-    sa.Column('team_id', sa.Integer(), nullable=False),
-    sa.ForeignKeyConstraint(['role_id'], ['UserRoles.id'], ),
-    sa.ForeignKeyConstraint(['team_id'], ['Team.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
-    with op.batch_alter_table('User', schema=None) as batch_op:
-        batch_op.create_index(batch_op.f('ix_User_email'), ['email'], unique=True)
-        batch_op.create_index(batch_op.f('ix_User_username'), ['username'], unique=False)
+        batch_op.create_index(batch_op.f('ix_ItemType_name'), ['name'], unique=False)
 
     op.create_table('Route',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -219,12 +243,30 @@ def upgrade():
         batch_op.create_index(batch_op.f('ix_Route_delivery_date'), ['delivery_date'], unique=False)
         batch_op.create_index(batch_op.f('ix_Route_route_label'), ['route_label'], unique=False)
 
-    op.create_table('type_property_association',
-    sa.Column('type_id', sa.Integer(), nullable=False),
-    sa.Column('property_id', sa.Integer(), nullable=False),
-    sa.ForeignKeyConstraint(['property_id'], ['ItemProperty.id'], ),
-    sa.ForeignKeyConstraint(['type_id'], ['ItemType.id'], ),
-    sa.PrimaryKeyConstraint('type_id', 'property_id')
+    op.create_table('TeamInvitesSend',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('user_id', sa.Integer(), nullable=True),
+    sa.Column('username', sa.String(), nullable=False),
+    sa.Column('email', sa.String(), nullable=False),
+    sa.Column('role_id', sa.Integer(), nullable=True),
+    sa.Column('date', sa.DateTime(), nullable=True),
+    sa.Column('team_id', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['role_id'], ['UserRoles.id'], ),
+    sa.ForeignKeyConstraint(['team_id'], ['Team.id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['User.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('UserTeamInvitationsReceived',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.Column('from_team_id', sa.Integer(), nullable=False),
+    sa.Column('from_team_name', sa.String(), nullable=False),
+    sa.Column('role_id', sa.Integer(), nullable=True),
+    sa.Column('date', sa.DateTime(), nullable=True),
+    sa.ForeignKeyConstraint(['from_team_id'], ['Team.id'], ),
+    sa.ForeignKeyConstraint(['role_id'], ['UserRoles.id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['User.id'], ),
+    sa.PrimaryKeyConstraint('id')
     )
     op.create_table('Order',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -260,6 +302,13 @@ def upgrade():
         batch_op.create_index('ix_order_client_primary_phone_gin', ['client_primary_phone'], unique=False, postgresql_using='gin')
         batch_op.create_index('ix_order_client_secondary_phone_gin', ['client_secondary_phone'], unique=False, postgresql_using='gin')
 
+    op.create_table('type_property_association',
+    sa.Column('type_id', sa.Integer(), nullable=False),
+    sa.Column('property_id', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['property_id'], ['ItemProperty.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['type_id'], ['ItemType.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('type_id', 'property_id')
+    )
     op.create_table('Item',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('article_number', sa.String(), nullable=False),
@@ -294,6 +343,7 @@ def downgrade():
         batch_op.drop_index(batch_op.f('ix_Item_article_number'))
 
     op.drop_table('Item')
+    op.drop_table('type_property_association')
     with op.batch_alter_table('Order', schema=None) as batch_op:
         batch_op.drop_index('ix_order_client_secondary_phone_gin', postgresql_using='gin')
         batch_op.drop_index('ix_order_client_primary_phone_gin', postgresql_using='gin')
@@ -304,17 +354,13 @@ def downgrade():
         batch_op.drop_index(batch_op.f('ix_Order_client_email'))
 
     op.drop_table('Order')
-    op.drop_table('type_property_association')
+    op.drop_table('UserTeamInvitationsReceived')
+    op.drop_table('TeamInvitesSend')
     with op.batch_alter_table('Route', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_Route_route_label'))
         batch_op.drop_index(batch_op.f('ix_Route_delivery_date'))
 
     op.drop_table('Route')
-    with op.batch_alter_table('User', schema=None) as batch_op:
-        batch_op.drop_index(batch_op.f('ix_User_username'))
-        batch_op.drop_index(batch_op.f('ix_User_email'))
-
-    op.drop_table('User')
     with op.batch_alter_table('ItemType', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_ItemType_name'))
 
@@ -327,15 +373,21 @@ def downgrade():
         batch_op.drop_index(batch_op.f('ix_UserVehicles_name'))
 
     op.drop_table('UserVehicles')
-    with op.batch_alter_table('UserRoles', schema=None) as batch_op:
-        batch_op.drop_index(batch_op.f('ix_UserRoles_role'))
+    with op.batch_alter_table('User', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_User_username'))
+        batch_op.drop_index(batch_op.f('ix_User_email'))
 
-    op.drop_table('UserRoles')
+    op.drop_table('User')
     op.drop_table('TwilioMod')
     with op.batch_alter_table('RouteState', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_RouteState_name'))
 
     op.drop_table('RouteState')
+    with op.batch_alter_table('RoleRules', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_RoleRules_role_id'))
+        batch_op.drop_index(batch_op.f('ix_RoleRules_name'))
+
+    op.drop_table('RoleRules')
     with op.batch_alter_table('MessageTemplate', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_MessageTemplate_name'))
         batch_op.drop_index(batch_op.f('ix_MessageTemplate_content'))
@@ -359,6 +411,10 @@ def downgrade():
 
     op.drop_table('ItemCategory')
     op.drop_table('EmailSMTP')
+    with op.batch_alter_table('UserRoles', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_UserRoles_role'))
+
+    op.drop_table('UserRoles')
     with op.batch_alter_table('Team', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_Team_name'))
 

@@ -1,5 +1,4 @@
-import eventlet
-eventlet.monkey_patch()
+
 # Standard library imports
 from datetime import timedelta
 import os
@@ -45,7 +44,7 @@ def create_app(config_name="development"):
     db.init_app(app)
     jwt.init_app(app)
     Migrate(app, db)
-    socketio.init_app(app)
+    socketio.init_app(app, cors_allowed_origins=frontend_origin)
 
     from .routers import register_blueprints
     register_blueprints(app)
