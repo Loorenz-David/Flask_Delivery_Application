@@ -93,6 +93,8 @@ def query_item_category():
     incoming_data = request.get_json(silent=True)
     response = Response(incoming_data=incoming_data, identity=identity)
     request_payload = response.incoming_data or {}
+    
+    
     if not isinstance(request_payload, dict):
         request_payload = {}
     if not request_payload.get('requested_data'):

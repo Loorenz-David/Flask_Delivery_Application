@@ -56,7 +56,7 @@ class GoogleRouteOptimizationClient:
         if os.environ.get("FLASK_ENVIROMENT") == "development":
             self.client = routeoptimization_v1.RouteOptimizationClient()
         else:
-            credentials = service_account.Credentials.from_service_account_info(json.loads(os.environ["GOOGLE_CREDENTIALS_JSON"]))
+            credentials = service_account.Credentials.from_service_account_info(json.loads(os.environ["GOOGLE_APPLICATION_CREDENTIALS"]))
             self.client = routeoptimization_v1.RouteOptimizationClient(credentials=credentials)
 
     def optimize(self, request: Dict[str, Any]):

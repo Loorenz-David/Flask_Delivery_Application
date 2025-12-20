@@ -47,3 +47,11 @@ USER_WAREHOUSE_REQUESTED_DATA = [
     'name',
     'location',
 ]
+
+PRINT_TEMPLATE_REQUESTED_DATA = [
+    'id',
+    'template_string',
+    'template_target',
+    'timestampt',
+    'name'
+]

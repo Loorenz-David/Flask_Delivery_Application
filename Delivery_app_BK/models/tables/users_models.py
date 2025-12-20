@@ -2,7 +2,7 @@
 # Thirs-party dependencies
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, JSON, Float
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, JSON, Float, Text
 from datetime import datetime, timezone
 
 # Local application imports
@@ -148,4 +148,18 @@ class UserVehicle(db.Model, ObjectObtainer, ObjectUpdator, TeamScopedMixin):
         "Team",
         backref="vehicles",
         lazy=True,
+    )
+
+class UserPrintLabelTemplates(db.Model, ObjectObtainer,ObjectUpdator,TeamScopedMixin):
+    __tablename__ = "UserPrintLabelTemplates"
+    id = Column(Integer, primary_key=True)
+    name = Column(String)
+    template_string = Column(Text)
+    template_target = Column(String) # Front end accepts "items" or "order"
+    timestampt = Column(DateTime)
+
+    team = relationship(
+        "Team",
+        backref="print_template_lable",
+        lazy=True
     )

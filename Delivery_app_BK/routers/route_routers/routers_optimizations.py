@@ -15,10 +15,11 @@ from Delivery_app_BK.services.routes_services.service_optimize import (
 @jwt_required()
 @role_required([1, 2, 3])
 def optimize_route():
+
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)
     response = Response(incoming_data=incoming_data, identity=identity)
-
+    
     if not response.error:
         service_optimize_route(response=response, identity=identity)
 

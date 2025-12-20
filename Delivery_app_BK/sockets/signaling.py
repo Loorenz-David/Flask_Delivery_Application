@@ -6,7 +6,7 @@ Socket.IO signaling server for real-time features:
 
 All handlers enforce JWT auth (token must include user_id, team_id, role_id).
 """
-print('Initializing signaling socket...')
+
 from functools import wraps
 from typing import Dict, Set
 
@@ -23,9 +23,16 @@ active_user_sessions: Dict[int, Set[str]] = {}
 
 def _extract_token() -> str | None:
   """Pull bearer token from query string or Authorization header."""
+
   auth_header = request.headers.get("Authorization", "")
+
   if auth_header.lower().startswith("bearer "):
     return auth_header.split(" ", 1)[1].strip()
+
+  # Fallback: allow token in query string for browser Socket.IO clients
+  query_token = request.args.get("token")
+  if query_token:
+    return query_token.strip()
   
   return None
 
@@ -60,6 +67,7 @@ def authenticated_only(fn):
   def wrapper(*args, **kwargs):
 
     claims = _verify_token()
+
     if not claims:
       return None
     return fn(claims, *args, **kwargs)
@@ -70,7 +78,7 @@ def authenticated_only(fn):
 @socketio.on("connect")
 @authenticated_only
 def handle_connect(claims):
-  print('Handling socket connect...')
+
   """On connect, join personal and team rooms for downstream emits."""
   user_id = claims.get("user_id")
   team_id = claims.get("team_id")
@@ -85,7 +93,7 @@ def handle_connect(claims):
   join_room(user_room, sid=request.sid)
   if team_room:
     join_room(team_room, sid=request.sid)
-
+  print(f'User {user_id} connected to rooms: {user_room}, {team_room}')
   active_user_sessions.setdefault(user_id, set()).add(request.sid)
   socketio.emit("presence:user_online", {"user_id": user_id}, room=user_room)
 
@@ -106,7 +114,7 @@ def handle_disconnect():
 @socketio.on("webrtc:signal")
 @authenticated_only
 def handle_webrtc_signal(claims, data):
-  print('Handling webrtc signal:', data)
+  print('Handling webrtc signal:')
   """
   Forward WebRTC signaling messages between the same user's devices.
   Expects: { "target_user_id": number, "payload": any }

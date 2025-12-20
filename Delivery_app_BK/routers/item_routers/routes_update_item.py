@@ -42,7 +42,7 @@ def update_item_category():
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)
     response = Response(incoming_data=incoming_data, identity=identity)
-
+    
     ObjectFiller.fill_object(
         response=response,
         fill_function=service_update_item_category,

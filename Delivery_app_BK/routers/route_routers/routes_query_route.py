@@ -14,7 +14,7 @@ from Delivery_app_BK.services.routes_services.service_query_routes import servic
 @jwt_required()
 @role_required([1, 2, 3])
 def query_route ():
-
+    
     identity = get_jwt()
     incoming_data = request.get_json(silent=True)
     response = Response(incoming_data=incoming_data, identity=identity)
