@@ -8,3 +8,5 @@ echo "$GOOGLE_APPLICATION_JSON" > /var/app/current/credentials/google_service_ac
 
 # Set secure permissions
 chmod 600 /var/app/current/credentials/google_service_account.json
+
+chown webapp:webapp /var/app/current/credentials/google_service_account.json
