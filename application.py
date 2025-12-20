@@ -1,5 +1,4 @@
-import eventlet
-eventlet.monkey_patch()
+
 from Delivery_app_BK import create_app
 from Delivery_app_BK.socketio_instance import socketio
 
