@@ -9,6 +9,5 @@ from flask_socketio import SocketIO
 socketio = SocketIO(async_mode="eventlet", 
                     cors_allowed_headers=["Authorization"],
                     cors_allowed_origins="*",
-                    message_queue="redis://"
-
+                   
                     )
