@@ -1,1 +1,1 @@
-web: gunicorn -k eventlet -w 1 wsgi:application
+web: python -c "import patch" && gunicorn -k eventlet -w 1 wsgi:application
