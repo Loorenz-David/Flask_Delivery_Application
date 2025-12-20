@@ -85,7 +85,6 @@ def query_route_main_dependencies():
       'item_positions': item_positions,
       'default_warehouses': default_warehouses,
     }
-
     response.set_payload(payload)
     response.compress_payload()
     response.set_message('Dependencies fetched successfully.')
