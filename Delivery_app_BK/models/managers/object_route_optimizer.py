@@ -53,7 +53,7 @@ class GoogleRouteOptimizationClient:
 
         self.parent = f"projects/{project_id}"
 
-        if os.environ.get("FLASK_ENVIROMENT") == "development":
+        if os.environ.get("FLASK_ENVIROMENT") == "": # development
             self.client = routeoptimization_v1.RouteOptimizationClient()
         else:
             credentials = service_account.Credentials.from_service_account_info(json.loads(os.environ["GOOGLE_APPLICATION_CREDENTIALS"]))
@@ -164,6 +164,7 @@ class ObjectRouteOptimizer:
             return True
 
         except Exception as exc:
+            print(exc)
             db.session.rollback()
             self.response.set_message("Error when optimizing the route.")
             self.response.set_error(str(exc), status=400)

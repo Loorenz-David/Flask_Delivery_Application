@@ -1,7 +1,7 @@
 __pycache__
 .pytest_cache
 .env
-google_service_account.json
+credentials/
 .venv/
 
 
