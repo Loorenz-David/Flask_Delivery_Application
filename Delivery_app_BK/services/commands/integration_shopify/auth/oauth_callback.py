@@ -78,6 +78,7 @@ def handle_shopify_oauth_callback(ctx: ServiceContext, params):
     shop = params.get("shop")
     code = params.get("code")
     state = params.get("state")
+    host = params.get("host")
 
     if not shop or not code:
         raise ValidationFailed("Missing shop or code")
@@ -127,5 +128,8 @@ def handle_shopify_oauth_callback(ctx: ServiceContext, params):
 
     # 4. Return frontend redirect
     return {
-        "redirect_url": f"{SHOPIFY_FRONTEND_URL}/integrations/shopify?status=connected"
+        "redirect_url": (
+            f"{BACKEND_PUBLIC_URL}/api_v2/shopify/app"
+            f"?status=connected&shop={shop}&embedded=1&host={host}"         
+        )
     }

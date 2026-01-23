@@ -6,7 +6,15 @@ from flask_jwt_extended import jwt_required, get_jwt
 from Delivery_app_BK.services.context import ServiceContext
 from Delivery_app_BK.services.run_service import run_service
 
-from Delivery_app_BK.services.commands.integration_shopify.auth import connect_to_shopify_store, handle_shopify_oauth_callback
+from Delivery_app_BK.services.commands.integration_shopify.auth import (
+    connect_to_shopify_store,
+    handle_shopify_oauth_callback,
+    handle_shopify_unisntall
+    )
+from Delivery_app_BK.services.commands.integration_shopify.webhooks import (
+    verify_shopify_webhook
+)
+
 
 from ..http.response import Response
 
@@ -55,4 +63,37 @@ def shopify_oauth_callback():
 @shopify_bp.route("/app")
 def shopify_app_home():
     shop = request.args.get("shop")
-    return render_template("shopify_app.html", shop=shop)
+    host = request.args.get("host")
+    status = request.args.get("status")
+    embedded = request.args.get("embedded") == "1"
+    return render_template("shopify_app.html", 
+                           shop=shop,
+                           host=host,
+                           embedded=embedded,
+                           status=status
+                           )
+
+
+@shopify_bp.route("/app-uninstalled", methods=["POST"])
+def shopify_app_uninstalled():
+    raw_body = request.get_data()
+    headers = request.headers
+
+    # 1. Verify webhook authenticity (REQUIRED)¨
+    try:
+        verify_shopify_webhook(raw_body, headers)
+    except Exception:
+        return "", 401
+
+    shop_domain = headers.get("X-Shopify-Shop-Domain")
+
+    if not shop_domain:
+        return "", 200  
+
+    try:
+
+        handle_shopify_unisntall(shop_domain)
+    except Exception:
+        pass
+
+    return "", 200
