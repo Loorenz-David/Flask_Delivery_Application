@@ -11,14 +11,29 @@ from Delivery_app_BK.services.commands.seed import seed_initial_data as seed_ini
 seed_bp = Blueprint("api_v2_seed_bp", __name__)
 
 
-def _is_development() -> bool:
-    return os.environ.get("FLASK_ENV", "development") == "development"
+def _is_valid(key) -> bool:
+    secrete_key = os.environ.get("SECRET_KEY")
+    
+    if not secrete_key:
+        return False
+    
+    return  secrete_key == key
 
+
+SECRETE_KEY = os.environ.get("SECRET_KEY")
 
 @seed_bp.route("/", methods=["POST"])
 def seed():
     response = Response()
-    if not _is_development():
+    data = request.get_json(silent=True)
+    key = data.get("key")
+
+    if not key:
+        return response.build_unsuccessful_response(
+            ValidationFailed("Missing key")
+        )
+    
+    if not _is_valid(key):
         return response.build_unsuccessful_response(
             ValidationFailed("Seed endpoint available only in development.")
         )
