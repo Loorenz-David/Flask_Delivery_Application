@@ -1,0 +1,51 @@
+
+class ServiceContext():
+
+    def __init__( 
+            self,
+            incoming_data=None,
+            query_params=None,
+            identity=None,
+            check_team_id = True,
+            inject_team_id = True,
+            skip_id_instance_injection = True,
+            relationship_map = None,
+            on_create_return = "map_ids_object",
+            on_query_return = "client_ids_map",
+            allow_is_system_modification = False
+    ):
+        self.incoming_data = incoming_data or {}
+        self.query_params = query_params or {}
+        self.identity = identity or {}
+        self.warnings = []
+        self.check_team_id = check_team_id
+        self.inject_team_id = inject_team_id
+        self.skip_id_instance_injection = skip_id_instance_injection 
+        self.relationship_map = relationship_map or {}
+        self.on_create_return = on_create_return
+        self.on_query_return = on_query_return
+        self.allow_is_system_modification = allow_is_system_modification 
+    
+    def set_warning( self, message ):
+        return self.warnings.append( message )
+
+    def set_relationship_map( self, map ):
+        self.relationship_map = map
+        return self
+
+    @property
+    def team_id( self ):
+
+        return self.identity.get( "team_id" )
+    
+    @property
+    def user_id ( self ):
+        return self.identity.get( "user_id" )
+    
+    @property
+    def role_id ( self ):
+        return self.identity.get( "role_id" )
+    
+    @property
+    def base_role_id ( self ):
+        return self.identity.get( "base_role_id" )

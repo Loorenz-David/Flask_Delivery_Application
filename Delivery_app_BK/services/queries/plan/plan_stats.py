@@ -1,0 +1,56 @@
+from typing import Type
+from flask_sqlalchemy.model import Model
+from sqlalchemy import func, distinct
+from sqlalchemy.orm import Query
+
+from Delivery_app_BK.models import DeliveryPlan, Order, Item
+
+from ...context import ServiceContext
+
+
+def plan_stats( query:Query, ctx:ServiceContext ):
+    query = query.order_by(None).limit(None).offset(None)
+
+    total_plans = query.with_entities(
+        func.count( DeliveryPlan.id )
+    ).scalar()
+
+    state_count = (
+        query
+        .with_entities(
+            DeliveryPlan.state_id,
+            func.count( distinct( DeliveryPlan.id ) )
+        )
+        .group_by( DeliveryPlan.state_id )
+        .all()
+    )
+
+    orders_count = (
+        query
+        .join( Order, Order.delivery_plan_id == DeliveryPlan.id )
+        .with_entities( func.count( distinct( Order.id ) ) )
+        .scalar()
+    )
+
+    item_count = (
+        query
+        .join( Order, Order.delivery_plan_id == DeliveryPlan.id )
+        .join( Item, Item.order_id == Order.id )
+        .with_entities( distinct( func.count( Item.id ) ) )
+        .scalar()
+    )
+
+    return {
+        "plans": {
+            "total": total_plans,
+            "by_state": {
+                state_id: count for state_id, count in state_count if state_id is not None
+            }
+        },
+        "orders":{
+            "total": orders_count
+        },
+        "items":{
+            "total": item_count
+        }
+    }

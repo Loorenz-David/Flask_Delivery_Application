@@ -1,10 +1,10 @@
-from sqlalchemy.exc import IntegrityError, DataError, OperationalError, ProgrammingError, SQLAlchemyError
+
 import asyncio
 from aiosmtplib import SMTP
 from typing import TYPE_CHECKING
 
 from Delivery_app_BK.models import db, EmailSMTP, TwilioMod, MessageTemplate
-from Delivery_app_BK.models.managers.object_searcher import GetObject
+from Delivery_app_BK.models.managers.column_inspector import GetObject
 
 if TYPE_CHECKING:
     from Delivery_app_BK.routers.utils.response import Response
@@ -186,10 +186,6 @@ class ObjectNotificator:
         
         return required_auth, message_template, target_clients
         
-       
-   
-    
-
 
     def build_message_report(self):
 

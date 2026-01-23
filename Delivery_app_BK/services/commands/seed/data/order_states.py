@@ -1,0 +1,58 @@
+ORDER_STATE_SEEDS = [
+    {
+        "id": 1,
+        "name": "Draft",
+        "color": "gray",
+        "index": 1,
+        "is_system": True,
+    },
+    {
+        "id": 2,
+        "name": "Confirmed",
+        "color": "gray",
+        "index": 2,
+        "is_system": True,
+    },
+    {
+        "id": 3,
+        "name": "Preparing",
+        "color": "blue",
+        "index": 3,
+        "is_system": True,
+    },
+    {
+        "id": 4,
+        "name": "Ready",
+        "color": "blue",
+        "index": 4,
+        "is_system": True,
+    },
+    {
+        "id": 5,
+        "name": "In Progress",
+        "color": "blue",
+        "index": 5,
+        "is_system": True,
+    },
+    {
+        "id": 6,
+        "name": "Completed",
+        "color": "green",
+        "index": 6,
+        "is_system": True,
+    },
+    {
+        "id": 8,
+        "name": "Cancelled",
+        "color": "red",
+        "index": 8,
+        "is_system": True,
+    },
+    {
+        "id": 7,
+        "name": "Fail",
+        "color": "yellow",
+        "index": 7,
+        "is_system": True,
+    },
+]

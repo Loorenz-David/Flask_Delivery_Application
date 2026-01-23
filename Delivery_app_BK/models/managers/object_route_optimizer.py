@@ -10,8 +10,8 @@ from google.oauth2 import service_account
 from google.protobuf.json_format import MessageToDict
 
 from Delivery_app_BK.models import db, Route, Order
-from Delivery_app_BK.models.managers.object_searcher import GetObject
-from Delivery_app_BK.models import UserVehicle  # type: ignore
+from Delivery_app_BK.models.managers.column_inspector import GetObject
+from Delivery_app_BK.models import Vehicle  # type: ignore
 
 
 if TYPE_CHECKING:
@@ -443,7 +443,7 @@ class ObjectRouteOptimizer:
         vehicle_instance = None
         if vehicle_id is not None:
             try:
-                vehicle_instance = GetObject.get_object(UserVehicle, vehicle_id, identity=self.identity)
+                vehicle_instance = GetObject.get_object(Vehicle, vehicle_id, identity=self.identity)
             except Exception:
                 vehicle_instance = None
 
