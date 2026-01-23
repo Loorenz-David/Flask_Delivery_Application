@@ -58,9 +58,9 @@ def create_app(config_name="development"):
 
     import Delivery_app_BK.sockets.signaling  
 
-    with app.app_context():
-        db.create_all()
-        pass
+    # with app.app_context():
+    #     db.create_all()
+    #     pass
    
     configure_mappers()
     
