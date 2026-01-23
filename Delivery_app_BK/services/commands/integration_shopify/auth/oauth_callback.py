@@ -124,6 +124,12 @@ def handle_shopify_oauth_callback(ctx: ServiceContext, params):
         topic="orders/create",
         address=f"{BACKEND_PUBLIC_URL}/webhooks/shopify/orders"
     )
+    create_shopify_webhook(
+    shop=shop,
+    access_token=access_token,
+    topic="app/uninstalled",
+    address=f"{BACKEND_PUBLIC_URL}/api_v2/shopify/app-uninstalled"
+)
     # ------------------------------------------------
 
     # 4. Return frontend redirect
