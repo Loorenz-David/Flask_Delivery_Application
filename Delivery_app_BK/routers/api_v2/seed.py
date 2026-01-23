@@ -10,32 +10,41 @@ from Delivery_app_BK.services.commands.seed import seed_initial_data as seed_ini
 
 seed_bp = Blueprint("api_v2_seed_bp", __name__)
 
+SECRETE_KEY = os.getenv("SECRET_KEY")
 
 def _is_valid(key) -> bool:
-    secrete_key = os.environ.get("SECRET_KEY")
     
-    if not secrete_key:
+    print(SECRETE_KEY )
+    print(key)
+
+    if not SECRETE_KEY :
         return False
     
-    return  secrete_key == key
+    return  SECRETE_KEY  == key
 
 
-SECRETE_KEY = os.environ.get("SECRET_KEY")
+
 
 @seed_bp.route("/", methods=["POST"])
 def seed():
     response = Response()
     data = request.get_json(silent=True)
+
+    if not data:
+        return response.build_unsuccessful_response(
+            ValidationFailed("Missing payload with key")
+        )
+    
     key = data.get("key")
 
     if not key:
         return response.build_unsuccessful_response(
             ValidationFailed("Missing key")
         )
-    
+
     if not _is_valid(key):
         return response.build_unsuccessful_response(
-            ValidationFailed("Seed endpoint available only in development.")
+            ValidationFailed("Failed, seed endpoint only available on development")
         )
 
     incoming_data = request.get_json(silent=True)

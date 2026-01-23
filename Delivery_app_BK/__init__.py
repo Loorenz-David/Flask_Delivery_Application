@@ -61,6 +61,7 @@ def create_app(config_name="development"):
    
    
     configure_mappers()
+
     
     @app.before_request
     def decompress_response():
