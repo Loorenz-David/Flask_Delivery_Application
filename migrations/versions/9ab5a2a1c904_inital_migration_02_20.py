@@ -1,8 +1,9 @@
-"""initial schema
+"""inital migration 02/20
 
-Revision ID: 9808d0e7ccc1
+
+Revision ID: 9ab5a2a1c904
 Revises: 
-Create Date: 2026-01-23 16:13:47.564638
+Create Date: 2026-02-20 17:10:13.652797
 
 """
 from alembic import op
@@ -10,7 +11,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '9808d0e7ccc1'
+revision = '9ab5a2a1c904'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -23,7 +24,7 @@ def upgrade():
     sa.Column('state', sa.String(length=128), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
     sa.Column('team_id', sa.Integer(), nullable=False),
-    sa.Column('expires_at', sa.DateTime, nullable=False),
+    sa.Column('expires_at', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=False),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('state'),
     sa.UniqueConstraint('team_id', 'state', name='uq_team_authstate')
@@ -36,7 +37,7 @@ def upgrade():
     sa.Column('status', sa.String(), nullable=True),
     sa.Column('retry_counter', sa.Integer(), nullable=True),
     sa.Column('dead_letter_attempt', sa.String(), nullable=True),
-    sa.Column('received_at', sa.DateTime(), nullable=True),
+    sa.Column('received_at', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
     with op.batch_alter_table('shopify_webhook_events', schema=None) as batch_op:
@@ -46,7 +47,7 @@ def upgrade():
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('client_id', sa.String(), nullable=True),
     sa.Column('name', sa.String(), nullable=False),
-    sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('created_at', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=True),
     sa.Column('missing_to_configure', postgresql.JSONB(astext_type=sa.Text()).with_variant(sa.JSON(), 'sqlite'), nullable=True),
     sa.Column('subscription', postgresql.JSONB(astext_type=sa.Text()).with_variant(sa.JSON(), 'sqlite'), nullable=True),
     sa.PrimaryKeyConstraint('id')
@@ -130,6 +131,7 @@ def upgrade():
     sa.Column('default', sa.Boolean(), nullable=True),
     sa.Column('description', sa.String(), nullable=True),
     sa.Column('index', sa.Integer(), nullable=True),
+    sa.Column('entry_point', sa.String(), nullable=True),
     sa.Column('is_system', sa.Boolean(), nullable=True),
     sa.Column('team_id', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['team_id'], ['team.id'], ),
@@ -159,37 +161,39 @@ def upgrade():
     op.create_table('label_template',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('client_id', sa.String(), nullable=True),
-    sa.Column('name', sa.String(), nullable=True),
-    sa.Column('template_string', sa.Text(), nullable=True),
-    sa.Column('template_target', sa.String(), nullable=True),
-    sa.Column('timestampt', sa.DateTime(), nullable=True),
+    sa.Column('enable', sa.Boolean(), nullable=True),
+    sa.Column('channel', sa.String(), nullable=True),
+    sa.Column('selected_variant', sa.String(), nullable=True),
+    sa.Column('orientation', sa.String(), nullable=True),
+    sa.Column('event', sa.String(), nullable=True),
+    sa.Column('ask_permission', sa.Boolean(), nullable=True),
     sa.Column('is_system', sa.Boolean(), nullable=True),
     sa.Column('team_id', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['team_id'], ['team.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('team_id', 'event', 'channel', name='uq_label_template_team_event_channel')
     )
     with op.batch_alter_table('label_template', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_label_template_client_id'), ['client_id'], unique=False)
         batch_op.create_index(batch_op.f('ix_label_template_is_system'), ['is_system'], unique=False)
-        batch_op.create_index(batch_op.f('ix_label_template_name'), ['name'], unique=False)
 
     op.create_table('message_template',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('client_id', sa.String(), nullable=True),
-    sa.Column('content', sa.Text(), nullable=False),
-    sa.Column('name', sa.String(), nullable=False),
+    sa.Column('event', sa.String(), nullable=True),
+    sa.Column('enable', sa.Boolean(), nullable=True),
+    sa.Column('template', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('name', sa.String(), nullable=True),
+    sa.Column('ask_permission', sa.Boolean(), nullable=True),
     sa.Column('channel', sa.String(), nullable=False),
-    sa.Column('timestampt', sa.DateTime(), nullable=True),
-    sa.Column('is_system', sa.Boolean(), nullable=True),
+    sa.Column('timestampt', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=True),
     sa.Column('team_id', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['team_id'], ['team.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('team_id', 'event', 'channel', name='uq_message_template_team_event_channel')
     )
     with op.batch_alter_table('message_template', schema=None) as batch_op:
-        batch_op.create_index(batch_op.f('ix_message_template_channel'), ['channel'], unique=False)
         batch_op.create_index(batch_op.f('ix_message_template_client_id'), ['client_id'], unique=False)
-        batch_op.create_index(batch_op.f('ix_message_template_is_system'), ['is_system'], unique=False)
-        batch_op.create_index(batch_op.f('ix_message_template_name'), ['name'], unique=False)
 
     op.create_table('order_state',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -226,9 +230,10 @@ def upgrade():
     op.create_table('twilio_mod',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('client_id', sa.String(), nullable=True),
-    sa.Column('twilio_sid', sa.String(), nullable=True),
-    sa.Column('twilio_token_encrypted', sa.String(), nullable=True),
-    sa.Column('sender_number', sa.String(), nullable=True),
+    sa.Column('twilio_account_sid', sa.String(), nullable=False),
+    sa.Column('twilio_api_key_sid', sa.String(), nullable=False),
+    sa.Column('twilio_api_key_secret_encrypted', sa.String(), nullable=False),
+    sa.Column('sender_number', sa.String(), nullable=False),
     sa.Column('team_id', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['team_id'], ['team.id'], ),
     sa.PrimaryKeyConstraint('id')
@@ -254,9 +259,9 @@ def upgrade():
     sa.Column('client_id', sa.String(), nullable=True),
     sa.Column('label', sa.String(), nullable=False),
     sa.Column('plan_type', sa.String(), nullable=False),
-    sa.Column('start_date', sa.DateTime, nullable=True),
-    sa.Column('end_date', sa.DateTime, nullable=True),
-    sa.Column('created_at', sa.DateTime, nullable=True),
+    sa.Column('start_date', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=True),
+    sa.Column('end_date', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=True),
+    sa.Column('created_at', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=True),
     sa.Column('state_id', sa.Integer(), nullable=True),
     sa.Column('team_id', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['state_id'], ['plan_state.id'], ondelete='SET NULL'),
@@ -297,8 +302,8 @@ def upgrade():
     op.create_table('date_range_access_rule',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('client_id', sa.String(), nullable=True),
-    sa.Column('from_date', sa.DateTime(), nullable=True),
-    sa.Column('to_date', sa.DateTime(), nullable=True),
+    sa.Column('from_date', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=True),
+    sa.Column('to_date', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=True),
     sa.Column('target_model', sa.String(), nullable=True),
     sa.Column('user_role_id', sa.Integer(), nullable=True),
     sa.Column('team_id', sa.Integer(), nullable=True),
@@ -331,6 +336,7 @@ def upgrade():
     sa.Column('external_order_id', sa.String(), nullable=True),
     sa.Column('external_source', sa.String(), nullable=True),
     sa.Column('tracking_number', sa.String(), nullable=True),
+    sa.Column('tracking_link', sa.String(), nullable=True),
     sa.Column('client_first_name', sa.String(), nullable=True),
     sa.Column('client_last_name', sa.String(), nullable=True),
     sa.Column('client_email', sa.String(), nullable=True),
@@ -338,11 +344,11 @@ def upgrade():
     sa.Column('client_secondary_phone', postgresql.JSONB(astext_type=sa.Text()).with_variant(sa.JSON(), 'sqlite'), nullable=True),
     sa.Column('client_address', postgresql.JSONB(astext_type=sa.Text()).with_variant(sa.JSON(), 'sqlite'), nullable=True),
     sa.Column('marketing_messages', sa.Boolean(), nullable=True),
-    sa.Column('earliest_delivery_date', sa.DateTime, nullable=True),
-    sa.Column('latest_delivery_date', sa.DateTime, nullable=True),
+    sa.Column('earliest_delivery_date', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=True),
+    sa.Column('latest_delivery_date', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=True),
     sa.Column('preferred_time_start', sa.String(), nullable=True),
     sa.Column('preferred_time_end', sa.String(), nullable=True),
-    sa.Column('creation_date', sa.DateTime, nullable=True),
+    sa.Column('creation_date', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=True),
     sa.Column('order_state_id', sa.Integer(), nullable=True),
     sa.Column('delivery_plan_id', sa.Integer(), nullable=True),
     sa.Column('team_id', sa.Integer(), nullable=True),
@@ -364,8 +370,9 @@ def upgrade():
         batch_op.create_index(batch_op.f('ix_order_external_order_id'), ['external_order_id'], unique=False)
         batch_op.create_index(batch_op.f('ix_order_external_source'), ['external_source'], unique=False)
         batch_op.create_index(batch_op.f('ix_order_latest_delivery_date'), ['latest_delivery_date'], unique=False)
-        batch_op.create_index(batch_op.f('ix_order_order_plan_intention'), ['order_plan_objective'], unique=False)
+        batch_op.create_index(batch_op.f('ix_order_order_plan_objective'), ['order_plan_objective'], unique=False)
         batch_op.create_index(batch_op.f('ix_order_reference_number'), ['reference_number'], unique=False)
+        batch_op.create_index(batch_op.f('ix_order_tracking_link'), ['tracking_link'], unique=False)
         batch_op.create_index(batch_op.f('ix_order_tracking_number'), ['tracking_number'], unique=False)
 
     op.create_table('order_state_transition_rule',
@@ -393,7 +400,7 @@ def upgrade():
     sa.Column('old_team_id', sa.Integer(), nullable=True),
     sa.Column('old_role_id', sa.Integer(), nullable=True),
     sa.Column('show_app_tutorial', sa.Boolean(), nullable=True),
-    sa.Column('last_online', sa.DateTime(), nullable=True),
+    sa.Column('last_online', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=True),
     sa.Column('last_location', postgresql.JSONB(astext_type=sa.Text()).with_variant(sa.JSON(), 'sqlite'), nullable=True),
     sa.Column('user_role_id', sa.Integer(), nullable=True),
     sa.Column('team_id', sa.Integer(), nullable=True),
@@ -439,9 +446,8 @@ def upgrade():
     op.create_table('local_delivery_plan',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('client_id', sa.String(), nullable=True),
-    sa.Column('actual_start_time', sa.DateTime(), nullable=True),
-    sa.Column('actual_end_time', sa.DateTime(), nullable=True),
-    sa.Column('is_optimized', sa.Boolean(), nullable=True),
+    sa.Column('actual_start_time', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=True),
+    sa.Column('actual_end_time', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=True),
     sa.Column('driver_id', sa.Integer(), nullable=True),
     sa.Column('delivery_plan_id', sa.Integer(), nullable=False),
     sa.Column('team_id', sa.Integer(), nullable=True),
@@ -461,7 +467,7 @@ def upgrade():
     sa.Column('from_value', postgresql.JSONB(astext_type=sa.Text()).with_variant(sa.JSON(), 'sqlite'), nullable=True),
     sa.Column('to_value', postgresql.JSONB(astext_type=sa.Text()).with_variant(sa.JSON(), 'sqlite'), nullable=True),
     sa.Column('user_name', sa.String(), nullable=True),
-    sa.Column('changed_at', sa.DateTime, nullable=True),
+    sa.Column('changed_at', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=True),
     sa.Column('changed_by_user_id', sa.Integer(), nullable=True),
     sa.Column('order_id', sa.Integer(), nullable=False),
     sa.Column('team_id', sa.Integer(), nullable=True),
@@ -476,27 +482,44 @@ def upgrade():
         batch_op.create_index(batch_op.f('ix_order_audit_log_field_name'), ['field_name'], unique=False)
         batch_op.create_index(batch_op.f('ix_order_audit_log_order_id'), ['order_id'], unique=False)
 
-    op.create_table('order_chat',
+    op.create_table('order_case',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('client_id', sa.String(), nullable=True),
-    sa.Column('message', sa.Text(), nullable=True),
-    sa.Column('sender_name', sa.String(), nullable=True),
-    sa.Column('creation_date', sa.DateTime, nullable=True),
-    sa.Column('user_id', sa.Integer(), nullable=True),
+    sa.Column('state', sa.String(), nullable=False),
+    sa.Column('label', sa.String(), nullable=True),
+    sa.Column('creation_date', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=False),
     sa.Column('order_id', sa.Integer(), nullable=False),
-    sa.Column('team_id', sa.Integer(), nullable=True),
+    sa.Column('created_by', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['created_by'], ['user.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['order_id'], ['order.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['team_id'], ['team.id'], ),
-    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
-    with op.batch_alter_table('order_chat', schema=None) as batch_op:
-        batch_op.create_index(batch_op.f('ix_order_chat_client_id'), ['client_id'], unique=False)
+    with op.batch_alter_table('order_case', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_order_case_client_id'), ['client_id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_order_case_order_id'), ['order_id'], unique=False)
+
+    op.create_table('order_event',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('event_name', sa.String(), nullable=False),
+    sa.Column('payload', postgresql.JSONB(astext_type=sa.Text()).with_variant(sa.JSON(), 'sqlite'), nullable=False),
+    sa.Column('occurred_at', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=False),
+    sa.Column('order_id', sa.Integer(), nullable=False),
+    sa.Column('actor_id', sa.Integer(), nullable=True),
+    sa.Column('team_id', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['actor_id'], ['user.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['order_id'], ['order.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['team_id'], ['team.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    with op.batch_alter_table('order_event', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_order_event_event_name'), ['event_name'], unique=False)
+        batch_op.create_index(batch_op.f('ix_order_event_occurred_at'), ['occurred_at'], unique=False)
+        batch_op.create_index(batch_op.f('ix_order_event_order_id'), ['order_id'], unique=False)
 
     op.create_table('order_state_history',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('client_id', sa.String(), nullable=True),
-    sa.Column('changed_at', sa.DateTime, nullable=True),
+    sa.Column('changed_at', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=True),
     sa.Column('source', sa.String(), nullable=True),
     sa.Column('from_state_id', sa.Integer(), nullable=True),
     sa.Column('to_state_id', sa.Integer(), nullable=True),
@@ -515,12 +538,30 @@ def upgrade():
         batch_op.create_index(batch_op.f('ix_order_state_history_client_id'), ['client_id'], unique=False)
         batch_op.create_index(batch_op.f('ix_order_state_history_order_id'), ['order_id'], unique=False)
 
+    op.create_table('plan_event',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('event_name', sa.String(), nullable=False),
+    sa.Column('payload', postgresql.JSONB(astext_type=sa.Text()).with_variant(sa.JSON(), 'sqlite'), nullable=False),
+    sa.Column('occurred_at', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=False),
+    sa.Column('delivery_plan_id', sa.Integer(), nullable=False),
+    sa.Column('actor_id', sa.Integer(), nullable=True),
+    sa.Column('team_id', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['actor_id'], ['user.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['delivery_plan_id'], ['delivery_plan.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['team_id'], ['team.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    with op.batch_alter_table('plan_event', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_plan_event_delivery_plan_id'), ['delivery_plan_id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_plan_event_event_name'), ['event_name'], unique=False)
+        batch_op.create_index(batch_op.f('ix_plan_event_occurred_at'), ['occurred_at'], unique=False)
+
     op.create_table('shopify_integrations',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('shop', sa.String(), nullable=False),
     sa.Column('access_token', sa.Text(), nullable=False),
     sa.Column('scopes', sa.String(), nullable=False),
-    sa.Column('connected_at', sa.DateTime, nullable=False),
+    sa.Column('connected_at', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=True),
     sa.Column('team_id', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['team_id'], ['team.id'], ),
@@ -552,7 +593,7 @@ def upgrade():
     sa.Column('target_email', sa.String(), nullable=False),
     sa.Column('user_role_name', sa.String(), nullable=False),
     sa.Column('user_role_id', sa.Integer(), nullable=False),
-    sa.Column('creation_date', sa.DateTime(), nullable=True),
+    sa.Column('creation_date', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=True),
     sa.Column('target_user_id', sa.Integer(), nullable=True),
     sa.Column('team_id', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['target_user_id'], ['user.id'], ),
@@ -586,83 +627,164 @@ def upgrade():
         batch_op.create_index(batch_op.f('ix_vehicle_is_system'), ['is_system'], unique=False)
         batch_op.create_index(batch_op.f('ix_vehicle_name'), ['name'], unique=False)
 
+    op.create_table('case_chat',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('client_id', sa.String(), nullable=True),
+    sa.Column('message', sa.Text(), nullable=True),
+    sa.Column('creation_date', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=True),
+    sa.Column('user_id', sa.Integer(), nullable=True),
+    sa.Column('order_case_id', sa.Integer(), nullable=False),
+    sa.Column('team_id', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['order_case_id'], ['order_case.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['team_id'], ['team.id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ondelete='SET NULL'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    with op.batch_alter_table('case_chat', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_case_chat_client_id'), ['client_id'], unique=False)
+
+    op.create_table('order_event_action',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('action_name', sa.String(), nullable=False),
+    sa.Column('status', sa.String(), nullable=False),
+    sa.Column('attempts', sa.Integer(), nullable=False),
+    sa.Column('last_error', sa.Text(), nullable=True),
+    sa.Column('created_at', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=False),
+    sa.Column('updated_at', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=False),
+    sa.Column('event_id', sa.Integer(), nullable=False),
+    sa.Column('team_id', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['event_id'], ['order_event.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['team_id'], ['team.id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('event_id', 'action_name', name='uq_order_event_action_event_name')
+    )
+    with op.batch_alter_table('order_event_action', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_order_event_action_event_id'), ['event_id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_order_event_action_status'), ['status'], unique=False)
+
+    op.create_table('plan_event_action',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('action_name', sa.String(), nullable=False),
+    sa.Column('status', sa.String(), nullable=False),
+    sa.Column('attempts', sa.Integer(), nullable=False),
+    sa.Column('last_error', sa.Text(), nullable=True),
+    sa.Column('created_at', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=False),
+    sa.Column('updated_at', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=False),
+    sa.Column('event_id', sa.Integer(), nullable=False),
+    sa.Column('team_id', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['event_id'], ['plan_event.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['team_id'], ['team.id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('event_id', 'action_name', name='uq_plan_event_action_event_name')
+    )
+    with op.batch_alter_table('plan_event_action', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_plan_event_action_event_id'), ['event_id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_plan_event_action_status'), ['status'], unique=False)
+
+    op.create_table('route_solution',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('client_id', sa.String(), nullable=True),
+    sa.Column('label', sa.String(), nullable=True),
+    sa.Column('version', sa.Integer(), nullable=True),
+    sa.Column('algorithm', sa.String(), nullable=True),
+    sa.Column('score', sa.Float(), nullable=True),
+    sa.Column('total_distance_meters', sa.Integer(), nullable=True),
+    sa.Column('total_travel_time_seconds', sa.Integer(), nullable=True),
+    sa.Column('expected_start_time', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=True),
+    sa.Column('expected_end_time', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=True),
+    sa.Column('has_route_warnings', sa.Boolean(), nullable=True),
+    sa.Column('route_warnings', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('start_location', postgresql.JSONB(astext_type=sa.Text()).with_variant(sa.JSON(), 'sqlite'), nullable=True),
+    sa.Column('end_location', postgresql.JSONB(astext_type=sa.Text()).with_variant(sa.JSON(), 'sqlite'), nullable=True),
+    sa.Column('route_end_strategy', sa.Enum('round_trip', 'custom_end_address', 'end_at_last_stop', name='route_end_strategy'), nullable=False),
+    sa.Column('set_start_time', sa.String(), nullable=True),
+    sa.Column('set_end_time', sa.String(), nullable=True),
+    sa.Column('created_at', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=True),
+    sa.Column('is_selected', sa.Boolean(), nullable=True),
+    sa.Column('is_optimized', sa.Enum('optimize', 'partial optimize', 'not optimize', name='is_optimized'), nullable=False),
+    sa.Column('stop_count', sa.Integer(), nullable=True),
+    sa.Column('driver_id', sa.Integer(), nullable=True),
+    sa.Column('local_delivery_plan_id', sa.Integer(), nullable=False),
+    sa.Column('route_polyline', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('team_id', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['driver_id'], ['user.id'], ),
+    sa.ForeignKeyConstraint(['local_delivery_plan_id'], ['local_delivery_plan.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['team_id'], ['team.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    with op.batch_alter_table('route_solution', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_route_solution_client_id'), ['client_id'], unique=False)
+        batch_op.create_index(batch_op.f('ix_route_solution_local_delivery_plan_id'), ['local_delivery_plan_id'], unique=False)
+
     op.create_table('notification_read',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('client_id', sa.String(), nullable=True),
     sa.Column('reader_name', sa.String(), nullable=True),
-    sa.Column('seen_at', sa.DateTime, nullable=False),
+    sa.Column('seen_at', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=True),
-    sa.Column('order_chat_id', sa.Integer(), nullable=True),
-    sa.ForeignKeyConstraint(['order_chat_id'], ['order_chat.id'], ondelete='CASCADE'),
+    sa.Column('case_chat_id', sa.Integer(), nullable=True),
+    sa.ForeignKeyConstraint(['case_chat_id'], ['case_chat.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
     with op.batch_alter_table('notification_read', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_notification_read_client_id'), ['client_id'], unique=False)
 
-    op.create_table('route_optimization',
+    op.create_table('route_solution_stop',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('client_id', sa.String(), nullable=True),
-    sa.Column('version', sa.Integer(), nullable=True),
-    sa.Column('algorithm', sa.String(), nullable=True),
-    sa.Column('score', sa.Float(), nullable=True),
-    sa.Column('expected_start_time', sa.DateTime(), nullable=True),
-    sa.Column('expected_end_time', sa.DateTime(), nullable=True),
-    sa.Column('start_location', postgresql.JSONB(astext_type=sa.Text()).with_variant(sa.JSON(), 'sqlite'), nullable=True),
-    sa.Column('end_location', postgresql.JSONB(astext_type=sa.Text()).with_variant(sa.JSON(), 'sqlite'), nullable=True),
-    sa.Column('set_start_time', sa.DateTime(), nullable=True),
-    sa.Column('set_end_time', sa.DateTime(), nullable=True),
-    sa.Column('created_at', sa.DateTime, nullable=True),
-    sa.Column('is_selected', sa.Boolean(), nullable=True),
-    sa.Column('driver_id', sa.Integer(), nullable=True),
-    sa.Column('delivery_plan_id', sa.Integer(), nullable=False),
-    sa.Column('team_id', sa.Integer(), nullable=True),
-    sa.ForeignKeyConstraint(['delivery_plan_id'], ['local_delivery_plan.id'], ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['driver_id'], ['user.id'], ),
-    sa.ForeignKeyConstraint(['team_id'], ['team.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
-    with op.batch_alter_table('route_optimization', schema=None) as batch_op:
-        batch_op.create_index(batch_op.f('ix_route_optimization_client_id'), ['client_id'], unique=False)
-        batch_op.create_index(batch_op.f('ix_route_optimization_delivery_plan_id'), ['delivery_plan_id'], unique=False)
-
-    op.create_table('route_optimization_stop',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('client_id', sa.String(), nullable=True),
-    sa.Column('route_optimization_id', sa.Integer(), nullable=False),
+    sa.Column('route_solution_id', sa.Integer(), nullable=False),
     sa.Column('order_id', sa.Integer(), nullable=True),
-    sa.Column('waiting_time', sa.String(), nullable=True),
+    sa.Column('service_duration', sa.String(), nullable=True),
     sa.Column('in_range', sa.Boolean(), nullable=True),
     sa.Column('stop_order', sa.Integer(), nullable=True),
-    sa.Column('expected_arrival_time', sa.String(), nullable=True),
-    sa.Column('actual_arrival_time', sa.String(), nullable=True),
+    sa.Column('reason_was_skipped', sa.String(), nullable=True),
+    sa.Column('has_constraint_violation', sa.Boolean(), nullable=True),
+    sa.Column('constraint_warnings', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('eta_status', sa.Enum('valid', 'estimated', 'stale', name='eta_status'), nullable=False),
+    sa.Column('expected_arrival_time', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=True),
+    sa.Column('actual_arrival_time', Delivery_app_BK.models.utils.utc_datetime.UTCDateTime(timezone=True), nullable=True),
     sa.Column('team_id', sa.Integer(), nullable=True),
-    sa.ForeignKeyConstraint(['order_id'], ['order.id'], ),
-    sa.ForeignKeyConstraint(['route_optimization_id'], ['route_optimization.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['order_id'], ['order.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['route_solution_id'], ['route_solution.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['team_id'], ['team.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    with op.batch_alter_table('route_optimization_stop', schema=None) as batch_op:
-        batch_op.create_index(batch_op.f('ix_route_optimization_stop_client_id'), ['client_id'], unique=False)
+    with op.batch_alter_table('route_solution_stop', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_route_solution_stop_client_id'), ['client_id'], unique=False)
 
     # ### end Alembic commands ###
 
 
 def downgrade():
     # ### commands auto generated by Alembic - please adjust! ###
-    with op.batch_alter_table('route_optimization_stop', schema=None) as batch_op:
-        batch_op.drop_index(batch_op.f('ix_route_optimization_stop_client_id'))
+    with op.batch_alter_table('route_solution_stop', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_route_solution_stop_client_id'))
 
-    op.drop_table('route_optimization_stop')
-    with op.batch_alter_table('route_optimization', schema=None) as batch_op:
-        batch_op.drop_index(batch_op.f('ix_route_optimization_delivery_plan_id'))
-        batch_op.drop_index(batch_op.f('ix_route_optimization_client_id'))
-
-    op.drop_table('route_optimization')
+    op.drop_table('route_solution_stop')
     with op.batch_alter_table('notification_read', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_notification_read_client_id'))
 
     op.drop_table('notification_read')
+    with op.batch_alter_table('route_solution', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_route_solution_local_delivery_plan_id'))
+        batch_op.drop_index(batch_op.f('ix_route_solution_client_id'))
+
+    op.drop_table('route_solution')
+    with op.batch_alter_table('plan_event_action', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_plan_event_action_status'))
+        batch_op.drop_index(batch_op.f('ix_plan_event_action_event_id'))
+
+    op.drop_table('plan_event_action')
+    with op.batch_alter_table('order_event_action', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_order_event_action_status'))
+        batch_op.drop_index(batch_op.f('ix_order_event_action_event_id'))
+
+    op.drop_table('order_event_action')
+    with op.batch_alter_table('case_chat', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_case_chat_client_id'))
+
+    op.drop_table('case_chat')
     with op.batch_alter_table('vehicle', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_vehicle_name'))
         batch_op.drop_index(batch_op.f('ix_vehicle_is_system'))
@@ -678,16 +800,29 @@ def downgrade():
 
     op.drop_table('store_pickup_plan')
     op.drop_table('shopify_integrations')
+    with op.batch_alter_table('plan_event', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_plan_event_occurred_at'))
+        batch_op.drop_index(batch_op.f('ix_plan_event_event_name'))
+        batch_op.drop_index(batch_op.f('ix_plan_event_delivery_plan_id'))
+
+    op.drop_table('plan_event')
     with op.batch_alter_table('order_state_history', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_order_state_history_order_id'))
         batch_op.drop_index(batch_op.f('ix_order_state_history_client_id'))
         batch_op.drop_index(batch_op.f('ix_order_state_history_changed_at'))
 
     op.drop_table('order_state_history')
-    with op.batch_alter_table('order_chat', schema=None) as batch_op:
-        batch_op.drop_index(batch_op.f('ix_order_chat_client_id'))
+    with op.batch_alter_table('order_event', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_order_event_order_id'))
+        batch_op.drop_index(batch_op.f('ix_order_event_occurred_at'))
+        batch_op.drop_index(batch_op.f('ix_order_event_event_name'))
 
-    op.drop_table('order_chat')
+    op.drop_table('order_event')
+    with op.batch_alter_table('order_case', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_order_case_order_id'))
+        batch_op.drop_index(batch_op.f('ix_order_case_client_id'))
+
+    op.drop_table('order_case')
     with op.batch_alter_table('order_audit_log', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_order_audit_log_order_id'))
         batch_op.drop_index(batch_op.f('ix_order_audit_log_field_name'))
@@ -718,8 +853,9 @@ def downgrade():
     op.drop_table('order_state_transition_rule')
     with op.batch_alter_table('order', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_order_tracking_number'))
+        batch_op.drop_index(batch_op.f('ix_order_tracking_link'))
         batch_op.drop_index(batch_op.f('ix_order_reference_number'))
-        batch_op.drop_index(batch_op.f('ix_order_order_plan_intention'))
+        batch_op.drop_index(batch_op.f('ix_order_order_plan_objective'))
         batch_op.drop_index(batch_op.f('ix_order_latest_delivery_date'))
         batch_op.drop_index(batch_op.f('ix_order_external_source'))
         batch_op.drop_index(batch_op.f('ix_order_external_order_id'))
@@ -779,14 +915,10 @@ def downgrade():
 
     op.drop_table('order_state')
     with op.batch_alter_table('message_template', schema=None) as batch_op:
-        batch_op.drop_index(batch_op.f('ix_message_template_name'))
-        batch_op.drop_index(batch_op.f('ix_message_template_is_system'))
         batch_op.drop_index(batch_op.f('ix_message_template_client_id'))
-        batch_op.drop_index(batch_op.f('ix_message_template_channel'))
 
     op.drop_table('message_template')
     with op.batch_alter_table('label_template', schema=None) as batch_op:
-        batch_op.drop_index(batch_op.f('ix_label_template_name'))
         batch_op.drop_index(batch_op.f('ix_label_template_is_system'))
         batch_op.drop_index(batch_op.f('ix_label_template_client_id'))
 
