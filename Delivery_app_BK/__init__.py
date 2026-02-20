@@ -1,5 +1,4 @@
-import eventlet
-eventlet.monkey_patch()
+
 # Standard library imports
 from datetime import timedelta
 import os
@@ -59,10 +58,10 @@ def create_app(config_name="development"):
     import Delivery_app_BK.sockets.signaling  
 
     with app.app_context():
-        db.drop_all()
-        from Delivery_app_BK.services.infra.events import get_event_bus
 
+        from Delivery_app_BK.services.infra.events import get_event_bus
         get_event_bus()
+
     configure_mappers()
 
     
