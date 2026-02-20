@@ -20,7 +20,7 @@ auth_bp = Blueprint("api_v2_auth_bp", __name__)
 
 @auth_bp.route("/login", methods=["POST"])
 def login():
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity={},
@@ -42,7 +42,7 @@ def login():
 @jwt_required(refresh=True)
 def refresh_token():
     identity = get_jwt()
-   
+    
     ctx = ServiceContext(
         identity=identity,
     )

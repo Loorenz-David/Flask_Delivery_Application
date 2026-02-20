@@ -14,6 +14,7 @@ def find_items(
         query: Query | None = None,
 ):
     query = query or db.session.query(Item)
+    trimmed_query = str(params.get("q")).strip()
 
     if model_requires_team( Item ) and ctx.inject_team_id:
         params = inject_team_id( params, ctx )
@@ -25,16 +26,11 @@ def find_items(
         query = query.filter(Item.client_id == params.get("client_id"))
 
     if "article_number" in params:
-        article_number = params.get("article_number").strip()
-        query = query.filter(Item.article_number.ilike(f"{article_number}%"))
+        query = query.filter(Item.article_number.ilike(f"{trimmed_query}%"))
 
     if "item_type" in params:
-        item_type = params.get("item_type").strip()
-        query = query.filter(Item.item_type.ilike(f"{item_type}%"))
 
-    if "item_category" in params:
-        item_category = params.get("item_category").strip()
-        query = query.filter(Item.item_category.ilike(f"{item_category}%"))
+        query = query.filter(Item.item_type.ilike(f"{trimmed_query}%"))
 
     if "item_state_id" in params:
         state_ids = params.get("item_state_id")
@@ -60,11 +56,6 @@ def find_items(
     if "weight_max" in params:
         query = query.filter(Item.weight <= params.get("weight_max"))
 
-    if "value_min" in params:
-        query = query.filter(Item.item_valuation >= params.get("value_min"))
-
-    if "value_max" in params:
-        query = query.filter(Item.item_valuation <= params.get("value_max"))
 
     sort = params.get("sort", "id_desc")
     if sort == "id_asc":

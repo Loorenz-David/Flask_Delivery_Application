@@ -1,15 +1,15 @@
 from typing import Dict, Any
 from sqlalchemy.orm import Query
 
-from Delivery_app_BK.models import db, Order, Item
+from Delivery_app_BK.models import db, Order, Item, DeliveryPlan
 from Delivery_app_BK.services.utils import inject_team_id, model_requires_team
-from sqlalchemy import func, String
+from Delivery_app_BK.services.queries.utils  import parsed_string_to_list
+from sqlalchemy import func, String, or_
 
 from ...context import ServiceContext
 from ...utils import to_datetime
-from ..utils import apply_pagination_by_date
+from ..utils import apply_pagination_by_date, str_to_bool
 from ..item.find_items import find_items
-from .utils import normalize_phone
 
 
 def find_orders ( 
@@ -17,64 +17,153 @@ def find_orders (
         ctx: ServiceContext ,
         query: Query | None = None
 ):
-
+  
     query = query or db.session.query( Order )
 
     if model_requires_team( Order ) and ctx.inject_team_id:
         params = inject_team_id( params, ctx )
     
+  
     if "team_id" in params:
         query = query.filter( Order.team_id == params.get( "team_id" ) )
 
-    if "external_order_id" in params:
-        external_order_id = params.get( "external_order_id" ).strip()
-        query = query.filter( Order.external_order_id.ilike( f"{external_order_id}%" ) )
+    string_filter_map = {
+        # ---------------- ORDER FIELDS ----------------
+        "reference_number": {
+            "column": Order.reference_number,
+            "join": None,
+        },
+        "external_source": {
+            "column": Order.external_source,
+            "join": None,
+        },
+        "tracking_number": {
+            "column": Order.tracking_number,
+            "join": None,
+        },
+        "client_email": {
+            "column": Order.client_email,
+            "join": None,
+        },
+        "client_address": {
+            "column": Order.client_address.cast(String),
+            "join": None,
+            "full_text": True,
+        },
+        "client_name":{
+            "column":(
+                Order.client_first_name,
+                Order.client_last_name
+            ),
+            "join":None
+        },
+        # ---------------- JSON PHONE ----------------
+        # Stored as { prefix: string, number: string }
+        "client_phone": {
+            "column": (
+                Order.client_primary_phone["number"].astext,
+                Order.client_secondary_phone["number"].astext,
+            ),
+            "join": None,
+        },
+        # ---------------- ITEM FIELDS ----------------
+        "article_number": {
+            "column": Item.article_number,
+            "join": Order.items,
+        },
+        "item_type": {
+            "column": Item.item_type,
+            "join": Order.items,
+        },
+        # ---------------- DELIVERY PLAN ----------------
+        "plan_label": {
+            "column": DeliveryPlan.label,
+            "join": Order.delivery_plan,
+        },
+        "plan_type": {
+            "column": DeliveryPlan.plan_type,
+            "join": Order.delivery_plan,
+        },
+    }
 
-    if "external_source" in params:
-        external_source = params.get( "external_source" ).strip()
-        query = query.filter( Order.external_source.ilike( f"{external_source}%" ) )
+    trimmed_query = str(params.get("q") or "").strip()
+    incoming_string_columns = set()
 
-    if "tracking_number" in params:
-        tracking_number = params.get( "tracking_number" ).strip()
-        query = query.filter( Order.tracking_number.ilike( f"{tracking_number}%" ) )
+    if "s" in params:
+        parsed = parsed_string_to_list(params["s"], ctx)
+      
+        incoming_string_columns = set(parsed)
 
-    if "client_first_name" in params:
-        client_first_name = params.get( "client_first_name" ).strip()
-        query = query.filter( Order.client_first_name.ilike( f"{client_first_name}%" ) )
+   
+    if trimmed_query:
+        if incoming_string_columns:
+            active_columns = incoming_string_columns
+        else:
+            active_columns = string_filter_map.keys()
+    else:
+        active_columns = set()
 
-    if "client_last_name" in params:
-        client_last_name = params.get( "client_last_name" ).strip()
-        query = query.filter( Order.client_last_name.ilike( f"{client_last_name}%" ) )
+    joined_relations = set()
+    filters = []
+   
+    if trimmed_query and active_columns:
+        pattern = f"%{trimmed_query}%"
 
-    if "client_email" in params:
-        client_email = params.get( "client_email" ).strip()
-        query = query.filter( Order.client_email.ilike( f"{client_email}%" ) )
+        for key in active_columns:
+            config = string_filter_map.get(key)
+            if not config:
+                continue
 
-    if "client_address" in params:
-        client_address = params.get( "client_address" ).strip()
-        query = query.filter(
-            func.to_tsvector(
-                "simple",
-                Order.client_address.cast( String )
-            ).op("@@")(
-                func.plainto_tsquery( "simple", client_address )
-            )
-        )
-    if "client_phone" in params:
-        phone = normalize_phone( params.get( "client_phone" ) )
-        query = query.filter(
-            Order.client_primary_phone["number"].astext.ilike(f"%{phone}%")
-            |
-            Order.client_secondary_phone["number"].astext.ilike(f"%{phone}%")
-        )
-    
+            column = config["column"]
+            join_target = config.get("join")
+
+            # SAFE JOIN (only once)
+            if join_target and join_target not in joined_relations:
+                query = query.outerjoin(join_target)
+                joined_relations.add(join_target)
+
+            # FULL TEXT SEARCH
+            if config.get("full_text"):
+                filters.append(
+                    func.to_tsvector("simple", column).op("@@")(
+                        func.plainto_tsquery("simple", trimmed_query)
+                    )
+                )
+                continue
+
+            # MULTI COLUMN SEARCH (client_phone)
+            if isinstance(column, tuple):
+                filters.append(
+                    or_(*[col.ilike(pattern) for col in column])
+                )
+            else:
+                filters.append(column.ilike(pattern))
+
+        if filters:
+            query = query.filter(or_(*filters))
+
+
+    if "schedule_order" in params:
+        if str_to_bool(params["schedule_order"]):
+            query = query.filter(Order.delivery_plan_id.isnot(None))
+        else:
+            query = query.filter(Order.delivery_plan_id.is_(None))
+            
+
     if "earliest_delivery_date" in params:
         earliest_delivery_date = to_datetime( params.get( "earliest_delivery_date" ) )
-        query = query.filter( Order.earliest_delivery_date >= earliest_delivery_date)
+
+        query = query.filter( 
+            Order.earliest_delivery_date.isnot(None),
+            Order.earliest_delivery_date >= earliest_delivery_date
+        )
 
     if "latest_delivery_date" in params:
         latest_delivery_date = to_datetime ( params.get( "latest_delivery_date" ) )
-        query = query.filter( Order.latest_delivery_date <= latest_delivery_date )
+        query = query.filter( 
+            Order.latest_delivery_date.isnot(None),
+            Order.latest_delivery_date <= latest_delivery_date 
+        )
 
     if "creation_date_from" in params:
         creation_date_from = to_datetime( params.get("creation_date_from" ) )
@@ -95,12 +184,16 @@ def find_orders (
     #----------------------------------------------------
 
 
-
     #  query on items table -------------------------
 
     item_params = params.get( "items" )
     if item_params:
-        query = query.join( Order.items )
+        item_params["q"] = trimmed_query
+
+        if Order.items not in joined_relations:
+            query = query.join(Order.items)
+            joined_relations.add(Order.items)
+
         query = find_items(
             params = item_params,
             ctx = ctx,
@@ -135,6 +228,8 @@ def find_orders (
         params = params,
         sort = params.get( "sort", 'date_desc')
     )
+
+   
 
     #----------------------------------------------------
 

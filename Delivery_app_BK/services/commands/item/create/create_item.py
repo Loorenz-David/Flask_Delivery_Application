@@ -30,4 +30,4 @@ def create_item(ctx: ServiceContext):
     db.session.flush()
     result = build_create_result(ctx, instances)
     db.session.commit()
-    return result
+    return {"item":result}

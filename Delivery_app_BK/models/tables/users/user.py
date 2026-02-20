@@ -1,12 +1,13 @@
 # Thirs-party dependencies
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, JSON
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, JSON
 from datetime import datetime, timezone
 
 # Local application imports
 from Delivery_app_BK.models import db
 from Delivery_app_BK.models.mixins.team_mixings.team_id import TeamScopedMixin
+from Delivery_app_BK.models.utils import UTCDateTime
 from Delivery_app_BK.models.mixins.validation_mixins.phone_number_validation import (
     PhoneNumberJSONValidationMixin
 )
@@ -41,7 +42,7 @@ class User(
     
     show_app_tutorial = Column(Boolean, default=True)
 
-    last_online = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    last_online = Column(UTCDateTime, default=lambda: datetime.now(timezone.utc))
     last_location = Column(JSONB().with_variant(JSON, "sqlite"))  
 
 
@@ -74,10 +75,10 @@ class User(
 
    
 
-    order_chats = relationship(
-        "OrderChat",
+    case_chats = relationship(
+        "CaseChat",
         back_populates="user",
-        lazy="selectin"
+        lazy="selectin",
     )
 
     route_solutions = relationship(

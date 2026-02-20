@@ -10,8 +10,10 @@ blinker==1.9.0
 brotli==1.2.0
 cachetools==6.2.1
 certifi==2025.10.5
+cffi==2.0.0
 charset-normalizer==3.4.4
 click==8.3.0
+cryptography==46.0.4
 dnspython==2.8.0
 eventlet==0.40.4
 Flask==3.1.2
@@ -23,7 +25,9 @@ Flask-SQLAlchemy==3.1.1
 frozenlist==1.8.0
 google-api-core==2.27.0
 google-auth==2.41.1
+google-geo-type==0.5.0
 google-maps-routeoptimization==0.2.0
+google-maps-routing==0.8.0
 googleapis-common-protos==1.71.0
 greenlet==3.3.0
 grpcio==1.76.0
@@ -42,6 +46,7 @@ marshmallow==4.0.1
 marshmallow-sqlalchemy==1.4.2
 multidict==6.7.0
 packaging==25.0
+phonenumbers==9.0.24
 pluggy==1.6.0
 propcache==0.4.1
 proto-plus==1.26.1
@@ -49,6 +54,7 @@ protobuf==6.33.0
 psycopg2-binary==2.9.11
 pyasn1==0.6.1
 pyasn1_modules==0.4.2
+pycparser==3.0
 Pygments==2.19.2
 PyJWT==2.10.1
 pytest==8.4.2

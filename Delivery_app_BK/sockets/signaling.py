@@ -25,12 +25,14 @@ def _extract_token() -> str | None:
   """Pull bearer token from query string or Authorization header."""
 
   auth_header = request.headers.get("Authorization", "")
-
+  
   if auth_header.lower().startswith("bearer "):
     return auth_header.split(" ", 1)[1].strip()
 
   # Fallback: allow token in query string for browser Socket.IO clients
   query_token = request.args.get("token")
+
+  
   if query_token:
     return query_token.strip()
   
@@ -47,12 +49,13 @@ def _verify_token() -> dict | None:
     disconnect()
     return None
   try:
+  
     decoded = jwt.decode(
       token,
       current_app.config.get("JWT_SECRET_KEY"),
       algorithms=[current_app.config.get("JWT_ALGORITHM", "HS256")],
     )
-
+  
     return decoded
   except Exception:
 
@@ -93,7 +96,7 @@ def handle_connect(claims):
   join_room(user_room, sid=request.sid)
   if team_room:
     join_room(team_room, sid=request.sid)
-  print(f'User {user_id} connected to rooms: {user_room}, {team_room}')
+
   active_user_sessions.setdefault(user_id, set()).add(request.sid)
   socketio.emit("presence:user_online", {"user_id": user_id}, room=user_room)
 
@@ -114,7 +117,7 @@ def handle_disconnect():
 @socketio.on("webrtc:signal")
 @authenticated_only
 def handle_webrtc_signal(claims, data):
-  print('Handling webrtc signal:')
+
   """
   Forward WebRTC signaling messages between the same user's devices.
   Expects: { "target_user_id": number, "payload": any }
@@ -187,3 +190,80 @@ def handle_order_note(claims, data):
     {"order_id": data.get("order_id"), "note": data.get("note"), "author_id": claims.get("user_id")},
     room=f"team:{team_id}",
   )
+
+
+@socketio.on("external_form:join_user")
+@authenticated_only
+def handle_external_form_join_user(claims, data):
+
+    team_id = claims.get("team_id")
+    target_user_id = (data or {}).get("user_id")
+    
+    if team_id is None or target_user_id is None:
+        return
+
+    room = f"external_form:{team_id}:{target_user_id}"
+    
+    join_room(room, sid=request.sid)
+
+  
+@socketio.on("external_form:leave_user")
+@authenticated_only
+def handle_external_form_leave_user(claims, data):
+
+    team_id = claims.get("team_id")
+    target_user_id = (data or {}).get("user_id")
+
+    if team_id is None or target_user_id is None:
+        return
+
+    room = f"external_form:{team_id}:{target_user_id}"
+    leave_room(room, sid=request.sid)
+
+
+@socketio.on("external_form:submit_user")
+@authenticated_only
+def handle_external_form_submit_user(claims, data):
+
+    team_id = claims.get("team_id")
+    target_user_id = (data or {}).get("user_id")
+    form_data = (data or {}).get("form_data")
+    
+    if team_id is None or target_user_id is None or not form_data:
+        return
+
+    room = f"external_form:{team_id}:{target_user_id}"
+
+    socketio.emit(
+        "external_form:received",
+        {
+            "form_data": form_data,
+            "submitted_by": claims.get("user_id"),
+        },
+        room=room,
+        skip_sid=request.sid
+    )
+
+
+@socketio.on("external_form:request_user")
+@authenticated_only
+def handle_external_form_request_user(claims, data):
+
+    team_id = claims.get("team_id")
+    target_user_id = (data or {}).get("user_id")
+    request_data = (data or {}).get("request_data")
+
+    if team_id is None or target_user_id is None:
+        return
+
+    room = f"external_form:{team_id}:{target_user_id}"
+
+    socketio.emit(
+        "external_form:requested",
+        {
+            "request_data": request_data or {},
+            "requested_by": claims.get("user_id"),
+        },
+        room=room,
+        skip_sid=request.sid
+    )

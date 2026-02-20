@@ -27,7 +27,7 @@ class Response():
     def build_successful_response(self, payload=None, warnings=[], status = 200 ):
 
         set_payload = payload or self.payload
-
+       
         return jsonify({
             "data": set_payload,
             "warnings": warnings,

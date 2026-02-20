@@ -4,6 +4,8 @@ from ...context import ServiceContext
 
 def extract_fields(ctx: ServiceContext, return_single = False) -> list[dict]:
     incoming = ctx.incoming_data or {}
+    if ctx.extract_fields_key == False:
+        return [incoming] if isinstance(incoming, dict) else incoming
 
     if "fields" not in incoming:
         raise ValidationFailed("Missing key 'fields' in request payload.")

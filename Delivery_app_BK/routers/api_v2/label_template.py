@@ -25,7 +25,9 @@ from Delivery_app_BK.services.commands.label_template.update_print_template impo
 from Delivery_app_BK.services.commands.label_template.delete_print_template import (
     delete_label_template as delete_label_template_service,
 )
-
+from Delivery_app_BK.services.commands.label_template.toggle_template_state import (
+    toggle_template_state as toggle_template_state_service,
+)
 
 label_template_bp = Blueprint("api_v2_label_template_bp", __name__)
 
@@ -56,10 +58,11 @@ def list_label_templates():
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def create_label_template():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,
+        extract_fields_key=False
     )
     outcome = run_service(lambda c: create_label_template_service(c), ctx)
     response = Response()
@@ -78,7 +81,7 @@ def create_label_template():
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def update_label_template():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,
@@ -94,13 +97,35 @@ def update_label_template():
         warnings=ctx.warnings,
     )
 
+@label_template_bp.route("/<int:template_id>", methods=["PATCH"])
+@jwt_required()
+@role_required([ADMIN, ASSISTANT, DRIVER])
+def toggle_template_state(template_id):
+    identity = get_jwt()
+    incoming_data = request.get_json(silent=True) or {}
+    ctx = ServiceContext(
+        incoming_data=incoming_data,
+        identity=identity,
+    )
+    outcome = run_service(lambda c: toggle_template_state_service(c, template_id), ctx)
+    response = Response()
+
+    if outcome.error:
+        return response.build_unsuccessful_response(outcome.error)
+
+    return response.build_successful_response(
+        {},
+        warnings=ctx.warnings,
+    )
+
+
 
 @label_template_bp.route("/", methods=["DELETE"])
 @jwt_required()
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def delete_label_template():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,

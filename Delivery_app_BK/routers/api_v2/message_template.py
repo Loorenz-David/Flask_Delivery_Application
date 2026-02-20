@@ -36,7 +36,7 @@ message_template_bp = Blueprint("api_v2_message_template_bp", __name__)
 def list_message_templates():
     identity = get_jwt()
     ctx = ServiceContext(
-        query_params=request.args,
+        query_params=request.args.to_dict(),
         identity=identity,
     )
     outcome = run_service(lambda c: list_message_templates_service(c), ctx)
@@ -56,7 +56,7 @@ def list_message_templates():
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def create_message_template():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,
@@ -78,7 +78,7 @@ def create_message_template():
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def update_message_template():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,
@@ -100,7 +100,7 @@ def update_message_template():
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def delete_message_template():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,

@@ -4,6 +4,7 @@ class ServiceContext():
     def __init__( 
             self,
             incoming_data=None,
+            incoming_file=None,
             query_params=None,
             identity=None,
             check_team_id = True,
@@ -12,9 +13,12 @@ class ServiceContext():
             relationship_map = None,
             on_create_return = "map_ids_object",
             on_query_return = "client_ids_map",
-            allow_is_system_modification = False
+            allow_is_system_modification = False,
+            extract_fields_key = True,
+            prevent_event_bus = False
     ):
         self.incoming_data = incoming_data or {}
+        self.incoming_file = incoming_file or None
         self.query_params = query_params or {}
         self.identity = identity or {}
         self.warnings = []
@@ -25,6 +29,8 @@ class ServiceContext():
         self.on_create_return = on_create_return
         self.on_query_return = on_query_return
         self.allow_is_system_modification = allow_is_system_modification 
+        self.extract_fields_key = extract_fields_key
+        self.prevent_event_bus = prevent_event_bus
     
     def set_warning( self, message ):
         return self.warnings.append( message )

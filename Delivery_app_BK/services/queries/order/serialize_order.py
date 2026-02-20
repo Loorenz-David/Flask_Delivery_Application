@@ -1,8 +1,14 @@
 from typing import List
 from Delivery_app_BK.models import Order
+from Delivery_app_BK.services.domain.order.order_case_states import OrderCaseState
 
 from ...context import ServiceContext
 from ..utils import map_return_values, calculate_order_metrics
+
+
+def _count_open_order_cases(order: Order) -> int:
+    cases = getattr(order, "order_cases", None) or []
+    return sum(1 for case in cases if case.state != OrderCaseState.RESOLVED.value)
 
 
 def serialize_orders( instances: List[ Order ], ctx:ServiceContext  ):
@@ -16,7 +22,7 @@ def serialize_orders( instances: List[ Order ], ctx:ServiceContext  ):
         unpacked = {
             "id": instance.id,
             "client_id": instance.client_id,
-            "order_plan_intention": instance.order_plan_intention,
+            "order_plan_objective": instance.order_plan_objective,
             "reference_number": instance.reference_number,
             "external_order_id": instance.external_order_id,
             "external_source": instance.external_source,
@@ -35,6 +41,7 @@ def serialize_orders( instances: List[ Order ], ctx:ServiceContext  ):
             "creation_date": creation_date.isoformat() if creation_date else None,
             "order_state_id": instance.order_state_id,
             "delivery_plan_id": instance.delivery_plan_id,
+            "open_order_cases": _count_open_order_cases(instance),
         }
         unpacked.update(calculate_order_metrics(instance))
         unpacked_instances.append( unpacked )

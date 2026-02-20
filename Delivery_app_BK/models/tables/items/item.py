@@ -19,7 +19,6 @@ class Item(db.Model, TeamScopedMixin):
     
     item_type = Column(String)
 
-
     is_system = Column(Boolean, default=False, index=True)
     
     properties = Column(JSONB().with_variant(JSON, "sqlite"))  # a list of dicts imprinted by the table ItemProperties

@@ -1,3 +1,7 @@
+import re
+import phonenumbers
+from phonenumbers import NumberParseException
+
 from Delivery_app_BK.services.commands.utils import generate_client_id
 from Delivery_app_BK.errors import ValidationFailed
 
@@ -17,17 +21,18 @@ def _build_address_object( address:dict | None ):
     has_coords = latitude is not None and longitude is not None
     has_street = bool(street_address)
 
-    if has_coords and has_street:
-        return  {
-            "street_address": street_address,
-            "city": address.get("city"),
-            "country":address.get("country"),
-            "postal_code":address.get("zip"),
-            "coordinates":{
-                "lat":latitude,
-                "lng":longitude,
+    if has_coords and has_street and street_address:
+        if has_coords and has_street:
+            return {
+                "street_address": street_address,
+                "city": address.get("city") or "",
+                "country": address.get("country") or "",
+                "postal_code": address.get("zip") or "",
+                "coordinates": {
+                    "lat": latitude,
+                    "lng": longitude,
+                }
             }
-        }
     if has_coords:
         # fix api call to get the street address 
         pass
@@ -40,15 +45,29 @@ def _build_address_object( address:dict | None ):
 def _build_phone_object(phone: str | None):
     if not isinstance(phone, str):
         return None
-    
-    phone_num = phone.strip()
-    if phone_num:
+
+    phone = phone.strip()
+    if not phone:
+        return None
+
+    try:
+        # Parse number (None = assume number includes country code like +46)
+        parsed_number = phonenumbers.parse(phone, None)
+
+        # Validate number
+        if not phonenumbers.is_valid_number(parsed_number):
+            return None
+
+        country_code = parsed_number.country_code
+        national_number = parsed_number.national_number
+
         return {
-            "prefix":'+',
-            "number": phone_num
+            "prefix": f"+{country_code}",
+            "number": str(national_number)
         }
-    
-    return None
+
+    except NumberParseException:
+        return None
 
 def _extract_client_fields(shipping_info: dict | None) :
     shipping_info_obj = {}
@@ -78,7 +97,7 @@ def order_mapper(shopify_order):
         raise ValidationFailed('Order must be a dict')
     
     order_object = {
-        "client_id": generate_client_id(),
+        "client_id": generate_client_id('order'),
         "reference_number": '#' + str(shopify_order.get("order_number")),
         "external_order_id": str(shopify_order.get("id")),
         "external_source": "shopify",

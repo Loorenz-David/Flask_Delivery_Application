@@ -9,14 +9,15 @@ def create_internal_order(
         shop:str,
         payload: dict,
 ):
+        
 
         shopify_shop = get_integration_by_shop(shop)
 
         if not shopify_shop:
                 raise NotFound(f"Shop integration not found with name: {shop}")
-
-
+       
         order =  order_mapper(payload)
+        
         line_items = payload.get("line_items") or []
         items = [ item_mapper(item) for item in line_items]
 

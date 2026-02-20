@@ -1,7 +1,7 @@
 # Thirs-party dependencies
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
-from sqlalchemy import Column, Integer, String, ForeignKey, JSON, DateTime
+from sqlalchemy import Column, Integer, String, ForeignKey, JSON
 
 # Local application imports
 from Delivery_app_BK.models import db

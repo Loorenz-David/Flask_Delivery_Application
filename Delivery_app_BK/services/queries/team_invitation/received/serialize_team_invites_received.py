@@ -12,6 +12,7 @@ def serialize_team_invites_received(instances: List[TeamInvites], ctx: ServiceCo
         invite_date = instance.creation_date
         unpacked = {
             "id": instance.id,
+            "client_id":instance.client_id,
             "from_team_name": instance.from_team_name,
             "user_role_name": instance.user_role_name,
             "creation_date": invite_date.isoformat() if invite_date else None,

@@ -9,16 +9,30 @@ def serialize_message_templates(instances: List[MessageTemplate], ctx: ServiceCo
     unpacked_instances = []
 
     for instance in instances:
-        timestampt = instance.timestampt
         unpacked = {
             "id": instance.id,
             "client_id": instance.client_id,
-            "content": instance.content,
-            "name": instance.name,
-            "channel": instance.channel,
-            "timestampt": timestampt.isoformat() if timestampt else None,
-            "is_system": instance.is_system,
+            "event":instance.event,
+            "enable":instance.enable,
+            "template":instance.template,
+            "ask_permission": instance.ask_permission,
+            "name":instance.name,
 
+        }
+        unpacked_instances.append(unpacked)
+
+    return map_return_values(unpacked_instances, ctx, "message_template")
+
+def serialize_message_templates_bootstrap(instances: List[MessageTemplate], ctx: ServiceContext):
+    unpacked_instances = []
+
+    for instance in instances:
+        unpacked = {
+            "id": instance.id,
+            "client_id": instance.client_id,
+            "event":instance.event,
+            "enable":instance.enable,
+            "ask_permission": instance.ask_permission,
         }
         unpacked_instances.append(unpacked)
 

@@ -22,6 +22,9 @@ from Delivery_app_BK.services.commands.item.create.create_item_state import (
 from Delivery_app_BK.services.commands.item.update.update_item_state import (
     update_item_state as update_item_state_service,
 )
+from Delivery_app_BK.services.commands.item.update.update_item_state_index import (
+    update_item_state_index as update_item_state_index_service,
+)
 from Delivery_app_BK.services.commands.item.delete.delete_item_state import (
     delete_item_state as delete_item_state_service,
 )
@@ -36,7 +39,7 @@ item_state_bp = Blueprint("api_v2_item_state_bp", __name__)
 def list_item_states():
     identity = get_jwt()
     ctx = ServiceContext(
-        query_params=request.args,
+        query_params=request.args.to_dict(),
         identity=identity,
     )
     outcome = run_service(lambda c: list_item_states_service(c), ctx)
@@ -56,7 +59,7 @@ def list_item_states():
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def create_item_state():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,
@@ -78,7 +81,7 @@ def create_item_state():
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def update_item_state():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,
@@ -95,12 +98,35 @@ def update_item_state():
     )
 
 
+@item_state_bp.route("/<int:state_id>/index/<int:new_index>", methods=["PATCH"])
+@jwt_required()
+@role_required([ADMIN, ASSISTANT, DRIVER])
+def update_item_state_index(state_id: int, new_index: int):
+    identity = get_jwt()
+    ctx = ServiceContext(
+        identity=identity,
+    )
+    outcome = run_service(
+        lambda c: update_item_state_index_service(c, state_id, new_index),
+        ctx,
+    )
+    response = Response()
+
+    if outcome.error:
+        return response.build_unsuccessful_response(outcome.error)
+
+    return response.build_successful_response(
+        {},
+        warnings=ctx.warnings,
+    )
+
+
 @item_state_bp.route("/", methods=["DELETE"])
 @jwt_required()
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def delete_item_state():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,

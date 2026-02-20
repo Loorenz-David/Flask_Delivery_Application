@@ -20,7 +20,7 @@ def get_user_profile(ctx: ServiceContext):
         raise NotFound(f"User with id: {ctx.user_id} does not exist.")
 
     serialized = serialize_user(
-        instance=[found_user],
+        instance=found_user,
         ctx=ctx,
     )
 

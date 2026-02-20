@@ -56,7 +56,7 @@ def register_user(ctx: ServiceContext):
         "password": User().hash_password(password),
         "phone_number": phone_number,
         "user_role_id": 1, # Default role assignment
-        "client_id": generate_client_id(),
+        "client_id": generate_client_id('user'),
     }
 
     user_instance: User = create_instance(ctx, User, user_fields)

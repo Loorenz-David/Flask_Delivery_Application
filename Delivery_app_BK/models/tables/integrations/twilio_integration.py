@@ -12,9 +12,10 @@ class TwilioMod(db.Model, TeamScopedMixin, SMSMixin):
 
     id = Column(Integer, primary_key=True)
     client_id = Column(String, index=True)
-    twilio_sid = Column(String)
-    twilio_token_encrypted = Column(String)
-    sender_number = Column(String)
+    twilio_account_sid = Column(String, nullable=False)
+    twilio_api_key_sid = Column(String, nullable=False)
+    twilio_api_key_secret_encrypted = Column(String, nullable=False)
+    sender_number = Column(String, nullable=False)
 
     team = relationship(
         "Team",

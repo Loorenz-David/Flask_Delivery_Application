@@ -13,13 +13,10 @@ seed_bp = Blueprint("api_v2_seed_bp", __name__)
 SECRETE_KEY = os.getenv("SECRET_KEY")
 
 def _is_valid(key) -> bool:
-    
-    print(SECRETE_KEY )
-    print(key)
 
     if not SECRETE_KEY :
         return False
-    
+   
     return  SECRETE_KEY  == key
 
 
@@ -28,7 +25,7 @@ def _is_valid(key) -> bool:
 @seed_bp.route("/", methods=["POST"])
 def seed():
     response = Response()
-    data = request.get_json(silent=True)
+    data = request.get_json(silent=True) or {}
 
     if not data:
         return response.build_unsuccessful_response(
@@ -47,7 +44,7 @@ def seed():
             ValidationFailed("Failed, seed endpoint only available on development")
         )
 
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         inject_team_id=False,

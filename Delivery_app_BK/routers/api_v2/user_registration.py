@@ -13,7 +13,7 @@ user_registration_bp = Blueprint("api_v2_user_registration_bp", __name__)
 
 @user_registration_bp.route("/", methods=["POST"])
 def register_user():
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         inject_team_id=False,

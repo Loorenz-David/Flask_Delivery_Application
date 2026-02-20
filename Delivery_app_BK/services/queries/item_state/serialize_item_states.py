@@ -18,6 +18,7 @@ def serialize_item_states(instances: List[ ItemState], ctx: ServiceContext):
             "description": instance.description,
             "index": instance.index,
             "is_system": instance.is_system,
+            "entry_point": instance.entry_point,
 
         }
         unpacked_instances.append(unpacked)

@@ -119,7 +119,7 @@ def list_date_range_access_rules():
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def create_date_range_access_rule():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,
@@ -144,7 +144,7 @@ def create_date_range_access_rule():
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def update_date_range_access_rule():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,
@@ -169,7 +169,7 @@ def update_date_range_access_rule():
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def delete_date_range_access_rule():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,
@@ -242,7 +242,7 @@ def list_order_state_transition_rules():
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def create_order_state_transition_rule():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,
@@ -267,7 +267,7 @@ def create_order_state_transition_rule():
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def update_order_state_transition_rule():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,
@@ -292,7 +292,7 @@ def update_order_state_transition_rule():
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def delete_order_state_transition_rule():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,

@@ -23,24 +23,28 @@ from .tables.items.item_type import ItemType
 from .tables.items.item_property import ItemProperty
 from .tables.items.item_state import ItemState
 from .tables.items.item_position import ItemPosition
-from .tables.deliveries.order import Order
-from .tables.deliveries.order_audit_log import OrderAuditLog
-from .tables.deliveries.delivery_plan import DeliveryPlan
-from .tables.deliveries.delivery_plan_types.local_delivery_plan import LocalDeliveryPlan
-from .tables.deliveries.delivery_plan_types.international_shipping_plan import (
+from .tables.order.order import Order
+from .tables.order.order_audit_log import OrderAuditLog
+from .tables.order.order_event import OrderEvent
+from .tables.order.order_event_action import OrderEventAction
+from .tables.delivery_plan.delivery_plan import DeliveryPlan
+from .tables.delivery_plan.delivery_plan_event import DeliveryPlanEvent
+from .tables.delivery_plan.delivery_plan_event_action import DeliveryPlanEventAction
+from .tables.delivery_plan.delivery_plan_types.local_delivery_plan.local_delivery_plan import LocalDeliveryPlan
+from .tables.delivery_plan.delivery_plan_types.international_shipping_plan import (
     InternationalShippingPlan,
 )
-from .tables.deliveries.delivery_plan_types.store_pickup_plan import StorePickupPlan
-from .tables.deliveries.route_solutions.route_solution import (
+from .tables.delivery_plan.delivery_plan_types.store_pickup_plan import StorePickupPlan
+from .tables.delivery_plan.delivery_plan_types.local_delivery_plan.route_solutions.route_solution import (
     RouteSolution,
 )
-from .tables.deliveries.route_solutions.route_stop import (
+from .tables.delivery_plan.delivery_plan_types.local_delivery_plan.route_solutions.route_stop import (
     RouteSolutionStop,
 )
-from .tables.deliveries.delivery_states.plan_state import PlanState
-from .tables.deliveries.delivery_states.order_state import OrderState
-from .tables.deliveries.delivery_states.order_state_history import OrderStateHistory
-from .tables.notifications.order_chat import OrderChat
+from .tables.delivery_plan.delivery_plan_state import DeliveryPlanState
+from .tables.order.order_state import OrderState
+from .tables.order.order_state_history import OrderStateHistory
+from .tables.order.order_case import OrderCase, CaseChat
 from .tables.notifications.notification_read import NotificationRead
 from .tables.integrations.email_integration import EmailSMTP
 from .tables.integrations.twilio_integration import TwilioMod

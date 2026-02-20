@@ -46,7 +46,7 @@ def shopify_orders_webhook():
             return "", 500  # force retry
 
 
-    payload = request.get_json(silent=True)
+    payload = request.get_json(silent=True) or {}
     
     try:
 
@@ -58,8 +58,8 @@ def shopify_orders_webhook():
         webhook_event_completed(event)
 
         return "", 200
-    except Exception:
-        print(Exception)
+    except Exception as e:
+        print('ERROR:', str(e))
         webhook_event_failed(event)
         return "", 500
    
@@ -68,7 +68,7 @@ def shopify_orders_webhook():
 
 @shopify_webhook_bp.route("/orders/test", methods=["POST"])
 def shop_test():
-    payload = request.get_json(silent=True)
+    payload = request.get_json(silent=True) or {}
     create_shopify_internal_order(
         shop = "teststoredeliveryapp.myshopify.com",
         payload = payload

@@ -58,8 +58,11 @@ def create_app(config_name="development"):
 
     import Delivery_app_BK.sockets.signaling  
 
-   
-   
+    with app.app_context():
+        db.create_all()
+        from Delivery_app_BK.services.infra.events import get_event_bus
+
+        get_event_bus()
     configure_mappers()
 
     
@@ -69,6 +72,11 @@ def create_app(config_name="development"):
 
     @app.after_request
     def compress_response( response ):
+
+        if request.path.startswith("/api"):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
 
         if request.endpoint == "api_v2_integration_shopify.shopify_app_home":
             response.headers["X-Frame-Options"] = "ALLOWALL"
@@ -87,5 +95,4 @@ def create_app(config_name="development"):
         return {"status": "ok"}, 200
 
     return app
-
 

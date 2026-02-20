@@ -59,7 +59,7 @@ def list_user_roles():
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def create_user_role():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,
@@ -81,7 +81,7 @@ def create_user_role():
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def update_user_role():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,
@@ -103,7 +103,7 @@ def update_user_role():
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def delete_user_role():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,

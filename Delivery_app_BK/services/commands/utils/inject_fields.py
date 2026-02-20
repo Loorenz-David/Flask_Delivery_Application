@@ -7,8 +7,22 @@ from Delivery_app_BK.models.managers.instance_linker import InstanceLinker
 from Delivery_app_BK.errors import ValidationFailed, NotFound
 
 from ...context import ServiceContext
+from ...queries.get_instances import get_instances
 from ...queries.get_instance import get_instance
 
+
+"""
+Relationship injection rules:
+
+- Scalar relationships (one-to-one, many-to-one):
+  Assigned directly.
+
+- Collection relationships (one-to-many, many-to-many):
+  MUST be provided as a full list.
+  Missing items are removed automatically.
+
+- All relationship queries are scoped by team_id.
+"""
 
 def inject_fields( 
         ctx: ServiceContext,
@@ -34,7 +48,7 @@ def inject_fields(
             
             column_inspector = ColumnInspector( field, Model )
 
-
+          
             # if the column holds a foreign key, it will link using the foreign key
             if column_inspector.is_foreign_key():
 
@@ -82,48 +96,51 @@ def inject_fields(
                     raise ValidationFailed(
                         f"Missing relationship mapping for '{column_inspector.column_name}'."
                     )
-                
-                # if it's a list (many-to-many) or ( one-to-many )
-                if isinstance(value,list):
-                    for related_id in value:
-                        related = get_instance( 
-                            ctx = ctx,
-                            model = related_model,
-                            value = related_id
+
+                if column_inspector.relationship.uselist:
+                    if not isinstance(value, list):
+                        raise ValidationFailed(
+                            f"'{column_inspector.column_name}' must be provided as a list."
                         )
+                    if not value:
+                        setattr(instance, column_inspector.column_name, [])
+                        continue
 
-                        if related is None:
-                            raise NotFound(
-                                f"Related record for '{column_inspector.column_name}' was not found."
-                            )
-
-                        link = InstanceLinker(
-                            owner = instance,
-                            related = related,
-                        ).link_using_relationship( column_inspector )
-                        if not link:
-                            raise ValidationFailed(
-                                f"Unable to link '{column_inspector.column_name}' with the provided value."
-                            )
-                else:
-                    # one-to-one or many-to-one
-                    related = get_instance( 
+                    related_instances = get_instances(
                         ctx = ctx,
                         model = related_model,
-                        value = value,
+                        ids = value
                     )
-                    if related is None:
-                        raise NotFound(
-                            f"Related record for '{column_inspector.column_name}' was not found."
-                        )
-                    link = InstanceLinker(
-                            owner = instance,
-                            related = related,
-                        ).link_using_relationship( column_inspector )
-                    if not link:
-                        raise ValidationFailed(
-                            f"Unable to link '{column_inspector.column_name}' with the provided value."
-                        )
+                    setattr(instance, column_inspector.column_name, related_instances)
+                    continue
+
+                if value is None:
+                    setattr(instance, column_inspector.column_name, None)
+                    continue
+
+                if isinstance(value, list):
+                    raise ValidationFailed(
+                        f"'{column_inspector.column_name}' must be a single id."
+                    )
+
+                # one-to-one or many-to-one
+                related = get_instance( 
+                    ctx = ctx,
+                    model = related_model,
+                    value = value,
+                )
+                if related is None:
+                    raise NotFound(
+                        f"Related record for '{column_inspector.column_name}' was not found."
+                    )
+                link = InstanceLinker(
+                        owner = instance,
+                        related = related,
+                    ).link_using_relationship( column_inspector )
+                if not link:
+                    raise ValidationFailed(
+                        f"Unable to link '{column_inspector.column_name}' with the provided value."
+                    )
                 continue
 
 

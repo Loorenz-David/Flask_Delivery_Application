@@ -7,12 +7,12 @@ from .find_optimizations import find_optimizations
 from .serialize_optimizations import serialize_optimizations
 
 
-def list_optimizations(delivery_plan_id: int, ctx: ServiceContext):
-    if not isinstance(delivery_plan_id, int):
+def list_optimizations(local_delivery_plan_id: int, ctx: ServiceContext):
+    if not isinstance(local_delivery_plan_id, int):
         raise ValidationFailed("delivery_plan_id must be an integer.")
 
     base_query = db.session.query(RouteSolution).filter(
-        RouteSolution.delivery_plan_id == delivery_plan_id
+        RouteSolution.local_delivery_plan_id == local_delivery_plan_id
     )
 
     query = find_optimizations(

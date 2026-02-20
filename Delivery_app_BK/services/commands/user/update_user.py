@@ -33,6 +33,9 @@ def update_user(ctx: ServiceContext):
         if not fields:
             raise ValidationFailed("No allowed fields provided to update user profile.")
 
+        if "password" in fields and fields["password"] is not None:
+            fields["password"] = User().hash_password(fields["password"])
+
         instance: User = update_instance(ctx, User, fields, ctx.user_id)
         instances.append(instance.id)
     db.session.commit()

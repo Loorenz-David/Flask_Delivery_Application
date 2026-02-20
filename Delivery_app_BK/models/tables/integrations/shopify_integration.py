@@ -1,8 +1,9 @@
 
-from sqlalchemy import Column, Integer, String, DateTime, Text, UniqueConstraint, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, UniqueConstraint, ForeignKey
 from sqlalchemy.orm import relationship
 from Delivery_app_BK.models import db
 from Delivery_app_BK.models.mixins.team_mixings.team_id import TeamScopedMixin
+from Delivery_app_BK.models.utils import UTCDateTime
 from datetime import datetime, timezone
 
 
@@ -23,7 +24,7 @@ class ShopifyIntegration(
     # will add column: primary_location_id
     scopes = Column(String, nullable=False)
 
-    connected_at = Column(DateTime(timezone=True), nullable=False, default=datetime.now(timezone.utc))
+    connected_at = Column(UTCDateTime, nullable=False, default=datetime.now(timezone.utc))
 
     user_id = Column(
         Integer,
@@ -55,7 +56,7 @@ class OAuthState(db.Model):
     state = Column(String(128), unique=True, nullable=False)
     user_id = Column(Integer, nullable=False)
     team_id = Column(Integer, nullable=False)
-    expires_at = Column(DateTime(timezone=True), nullable=False)
+    expires_at = Column(UTCDateTime, nullable=False)
 
 
 class ShopifyWebhookEvents(db.Model):
@@ -68,4 +69,4 @@ class ShopifyWebhookEvents(db.Model):
     status = Column(String)
     retry_counter = Column(Integer)
     dead_letter_attempt = Column(String)
-    received_at = Column(DateTime, default=datetime.now(timezone.utc))
+    received_at = Column(UTCDateTime, default=datetime.now(timezone.utc))

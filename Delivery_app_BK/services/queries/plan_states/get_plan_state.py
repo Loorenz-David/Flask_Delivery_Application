@@ -1,4 +1,4 @@
-from Delivery_app_BK.models import PlanState
+from Delivery_app_BK.models import DeliveryPlanState
 from Delivery_app_BK.errors import NotFound
 
 from ...context import ServiceContext
@@ -9,7 +9,7 @@ from .serialize_plan_states import serialize_plan_states
 def get_plan_state(state_id: int, ctx: ServiceContext):
     found_state = get_instance(
         ctx=ctx,
-        model=PlanState,
+        model=DeliveryPlanState,
         value=state_id,
     )
 

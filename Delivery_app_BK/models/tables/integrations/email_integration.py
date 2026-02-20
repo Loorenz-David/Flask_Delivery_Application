@@ -12,10 +12,10 @@ class EmailSMTP(db.Model, TeamScopedMixin, SMTPMixin):
 
     id = Column(Integer, primary_key=True)
     client_id = Column(String, index=True)
-    smtp_server = Column(String, nullable=False)
-    smtp_port = Column(Integer, default=587)
+    smtp_server = Column(String, nullable=False) # for gmail smtp.gmail.com
+    smtp_port = Column(Integer, default=587) # Default to 587 for TLS
     smtp_username = Column(String, nullable=False)
-    smtp_password_encrypted = Column(String, nullable=False)
+    smtp_password = Column(String, nullable=False)
     use_tls = Column(Boolean, default=True)
     use_ssl = Column(Boolean, default=False)
     max_per_session = Column(Integer, default=50)

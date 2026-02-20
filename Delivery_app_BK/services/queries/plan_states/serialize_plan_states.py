@@ -1,11 +1,11 @@
 from typing import Type,List
-from Delivery_app_BK.models import PlanState
+from Delivery_app_BK.models import DeliveryPlanState
 
 from ...context import ServiceContext
 from ..utils import map_return_values
 
 
-def serialize_plan_states(instances: List[PlanState], ctx: ServiceContext):
+def serialize_plan_states(instances: List[DeliveryPlanState], ctx: ServiceContext):
     unpacked_instances = []
 
     for instance in instances:

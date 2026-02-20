@@ -10,6 +10,7 @@ from Delivery_app_BK.routers.utils.role_decorator import (
 from Delivery_app_BK.routers.http.response import Response
 from Delivery_app_BK.services.context import ServiceContext
 from Delivery_app_BK.services.run_service import run_service
+from Delivery_app_BK.services.domain.plan.plan_states import PlanStateId
 from Delivery_app_BK.services.queries.plan.list_delivery_plans import (
     list_delivery_plans as list_delivery_plans_service,
 )
@@ -22,8 +23,14 @@ from Delivery_app_BK.services.commands.plan.create_plan import (
 from Delivery_app_BK.services.commands.plan.update_plan import (
     update_plan as update_plan_service,
 )
+from Delivery_app_BK.services.commands.plan.orchestrator import (
+    update_local_delivery_plan_settings as update_local_delivery_plan_settings_service,
+)
 from Delivery_app_BK.services.commands.plan.delete_plan import (
     delete_plan as delete_plan_service,
+)
+from Delivery_app_BK.services.commands.plan.mark_plan_state import (
+    mark_plan_state as mark_plan_state_service
 )
 from Delivery_app_BK.services.commands.plan_states.update_plan_state import (
     update_plan_state as update_plan_state_service,
@@ -91,7 +98,7 @@ def list_plan_states():
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def create_plan():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,
@@ -113,10 +120,12 @@ def create_plan():
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def update_plan():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
+    prevent_event_bus = incoming_data.pop("prevent_event_bus", False)
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,
+        prevent_event_bus = prevent_event_bus
     )
     outcome = run_service(lambda c: update_plan_service(c), ctx)
     response = Response()
@@ -130,12 +139,39 @@ def update_plan():
     )
 
 
+@plan_bp.route("/local_delivery", methods=["PATCH"])
+@jwt_required()
+@role_required([ADMIN, ASSISTANT, DRIVER])
+def update_local_delivery_plan_settings():
+    identity = get_jwt()
+    incoming_data = request.get_json(silent=True) or {}
+    prevent_event_bus = incoming_data.pop("prevent_event_bus", False)
+    ctx = ServiceContext(
+        incoming_data=incoming_data,
+        identity=identity,
+        prevent_event_bus = prevent_event_bus
+    )
+    outcome = run_service(
+        lambda c: update_local_delivery_plan_settings_service(c),
+        ctx,
+    )
+    response = Response()
+
+    if outcome.error:
+        return response.build_unsuccessful_response(outcome.error)
+
+    return response.build_successful_response(
+        outcome.data,
+        warnings=ctx.warnings,
+    )
+
+
 @plan_bp.route("/", methods=["DELETE"])
 @jwt_required()
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def delete_plan():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,
@@ -201,6 +237,7 @@ def get_plan_type(plan_id: int, plan_type: str):
 @jwt_required()
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def list_plan_orders(plan_id: int):
+
     identity = get_jwt()
     ctx = ServiceContext(
         query_params=request.args,
@@ -223,8 +260,12 @@ def list_plan_orders(plan_id: int):
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def update_plan_state(plan_id: int, state_id: int):
     identity = get_jwt()
+    incoming_data = request.get_json(silent=True) or {}
+    prevent_event_bus = incoming_data.pop("prevent_event_bus", False)
     ctx = ServiceContext(
         identity=identity,
+        prevent_event_bus=prevent_event_bus
+
     )
     outcome = run_service(
         lambda c: update_plan_state_service(c, plan_id, state_id),
@@ -237,5 +278,29 @@ def update_plan_state(plan_id: int, state_id: int):
 
     return response.build_successful_response(
         {},
+        warnings=ctx.warnings,
+    )
+
+
+@plan_bp.route("/<int:delivery_plan_id>/plan-is-ready", methods=["PATCH"])
+@jwt_required()
+@role_required([ADMIN, ASSISTANT, DRIVER])
+def mark_plan_state(delivery_plan_id: int):
+    identity = get_jwt()
+    ctx = ServiceContext(
+        identity=identity,
+    )
+
+    outcome = run_service(
+        lambda c: mark_plan_state_service(c,delivery_plan_id, PlanStateId.READY),
+        ctx,
+    )
+    response = Response()
+
+    if outcome.error:
+        return response.build_unsuccessful_response(outcome.error)
+
+    return response.build_successful_response(
+        outcome.data or {},
         warnings=ctx.warnings,
     )

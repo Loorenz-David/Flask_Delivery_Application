@@ -2,6 +2,8 @@ import asyncio
 from typing import TYPE_CHECKING
 from twilio.rest import Client
 
+from Delivery_app_BK.services.utils.crypto import decrypt_secret
+
 if TYPE_CHECKING:
     from Delivery_app_BK.models.tables.integration_models.twilio_integration import TwilioMod
     from Delivery_app_BK.models.tables.content_templates.message_template import MessageTemplate
@@ -12,7 +14,11 @@ class SMSMixin:
 
         """Initialize and return the Twilio client."""
         try:
-            return Client(self.twilio_sid, self.twilio_token_encrypted)
+            return Client(
+                self.twilio_api_key_sid,
+                decrypt_secret(self.twilio_api_key_secret_encrypted),
+                account_sid=self.twilio_account_sid,
+            )
         except Exception as e:
             raise ConnectionError(f"Failed to initialize Twilio client: {str(e)}")
 

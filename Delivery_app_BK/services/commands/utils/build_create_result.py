@@ -10,6 +10,7 @@ from . import build_dynamic_ids_map
 def build_create_result(
         ctx: ServiceContext,
         instances: List[Type[Model]],
+        extract_fields: list | None = None,
 ):
     if ctx is None:
         raise ValidationFailed("Service context is required to build create results.")
@@ -22,7 +23,11 @@ def build_create_result(
         return instances
 
     elif mode == "map_ids_object":
-        return build_dynamic_ids_map(instances)
+        return build_dynamic_ids_map(
+            instances,
+            extract_fields=extract_fields,
+            ctx=ctx,
+        )
 
     elif mode == "ids":
         ids = []

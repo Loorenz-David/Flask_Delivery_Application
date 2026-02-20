@@ -7,6 +7,7 @@ from Delivery_app_BK.services.utils import inject_team_id, model_requires_team
 
 from ...context import ServiceContext
 from ..utils import apply_pagination_by_id
+from ..utils.format_data import str_to_bool
 
 
 def find_item_states(
@@ -20,11 +21,31 @@ def find_item_states(
         params = inject_team_id(params, ctx)
 
 
+    include_defaults = False
+    if "include_defaults" in params:
+        include_defaults = str_to_bool(params.get("include_defaults"))
+
     if "team_id" in params:
+        if include_defaults:
+            query = query.filter(
+                or_(
+                    ItemState.is_system.is_(True),
+                    ItemState.default.is_(True),
+                    ItemState.team_id == params["team_id"],
+                )
+            )
+        else:
+            query = query.filter(
+                or_(
+                    ItemState.is_system.is_(True),
+                    ItemState.team_id == params["team_id"],
+                )
+            )
+    elif include_defaults:
         query = query.filter(
             or_(
                 ItemState.is_system.is_(True),
-                ItemState.team_id == params["team_id"],
+                ItemState.default.is_(True),
             )
         )
 

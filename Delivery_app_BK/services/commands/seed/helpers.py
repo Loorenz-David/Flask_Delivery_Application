@@ -17,7 +17,7 @@ def get_or_create(
 ) -> Tuple[Model, bool]:
 
     instance = db.session.query(model).filter_by(**lookup).first()
-
+   
     if instance:
         return instance, False
 

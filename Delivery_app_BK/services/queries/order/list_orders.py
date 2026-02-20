@@ -40,7 +40,6 @@ def list_orders(ctx: ServiceContext, plan_id: int | None = None):
         ctx = ctx
     )
 
-
     return {
         "order": serialize_objects,
         "order_stats": stats,

@@ -1,5 +1,5 @@
 from Delivery_app_BK.errors import ValidationFailed
-from Delivery_app_BK.models import db, DeliveryPlan, Team, Order, PlanState
+from Delivery_app_BK.models import db, DeliveryPlan, Team, Order, DeliveryPlanState
 from ...context import ServiceContext
 from ..base.update_instance import update_instance
 from ..utils import extract_targets
@@ -87,7 +87,7 @@ def _update_plan_type_instance(
 def update_plan(ctx: ServiceContext):
     relationship_map = {
         "team_id": Team,
-        "plan_state_id": PlanState
+        "plan_state_id": DeliveryPlanState
     }
     ctx.set_relationship_map(relationship_map)
     instances = []

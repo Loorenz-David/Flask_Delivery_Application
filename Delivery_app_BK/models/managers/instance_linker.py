@@ -51,14 +51,12 @@ class InstanceLinker:
                 f"'{column.column_name}' is not a valid relationship on {self.owner_model.__name__}"
             )
 
-        attr = getattr(self.owner, column.column_name)
-
-        # Many-to-many or one-to-many (uselist=True)
         if column.relationship.uselist:
-            if self.related not in attr:
-                attr.append(self.related)
-        else:
-            # One-to-one or many-to-one (uselist=False)
-            setattr(self.owner, column.column_name, self.related)
+            raise ValidationFailed(
+                "Collection relationships must be assigned as a full list"
+            )
+
+        # One-to-one or many-to-one (uselist=False)
+        setattr(self.owner, column.column_name, self.related)
 
         return True

@@ -6,6 +6,7 @@ from .seeders import (
     seed_user_roles,
     seed_plan_states,
     seed_order_states,
+    seed_item_states,
 )
 
 
@@ -35,6 +36,11 @@ SEED_REGISTRY = [
     SeedDefinition(
         name="order_states",
         seeder=seed_order_states,
+        depends_on=(),
+    ),
+    SeedDefinition(
+        name="item_states",
+        seeder=seed_item_states,
         depends_on=(),
     ),
 ]

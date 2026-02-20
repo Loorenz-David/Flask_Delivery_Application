@@ -1,11 +1,12 @@
 # Thirs-party dependencies
 from sqlalchemy.orm import relationship
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, ForeignKey
 from datetime import datetime, timezone
 
 # Local application imports
 from Delivery_app_BK.models import db
 from Delivery_app_BK.models.mixins.team_mixings.team_id import TeamScopedMixin
+from Delivery_app_BK.models.utils import UTCDateTime
 
 
 class TeamInvites(db.Model, TeamScopedMixin):
@@ -21,7 +22,7 @@ class TeamInvites(db.Model, TeamScopedMixin):
     user_role_name = Column( String, nullable=False )
     user_role_id = Column( Integer, nullable=False )
 
-    creation_date = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    creation_date = Column(UTCDateTime, default=lambda: datetime.now(timezone.utc))
 
     target_user_id = Column(
         Integer, 
@@ -31,4 +32,3 @@ class TeamInvites(db.Model, TeamScopedMixin):
 
     team = relationship("Team", lazy=True)
     user = relationship("User", lazy=True)
-

@@ -1,13 +1,14 @@
-import asyncio
 from aiosmtplib import SMTP
-from aiosmtplib.errors import *
+from aiosmtplib.errors import SMTPAuthenticationError, SMTPConnectError, SMTPRecipientsRefused
 from email.message import EmailMessage
 
 from typing import TYPE_CHECKING
 
+from Delivery_app_BK.services.utils.crypto import decrypt_secret
+
 if TYPE_CHECKING:
-    from Delivery_app_BK.models.tables.integration_models.email_integration import EmailSMTP
-    from Delivery_app_BK.models.tables.content_templates.message_template import MessageTemplate
+    from Delivery_app_BK.models import EmailSMTP
+    from Delivery_app_BK.models import MessageTemplate
 
 class SMTPMixin:
     async def get_smtp_connection(self:"EmailSMTP"):
@@ -24,17 +25,18 @@ class SMTPMixin:
             # Upgrade to TLS if use_tls is True (STARTTLS)
             # STARTTLS only if requested and supported by the server
             if self.use_tls and "starttls" in smtp.esmtp_extensions:
-                try:
-                    await smtp.starttls()
-                except Exception as tls_error:
-                    print("STARTTLS failed or already active:", tls_error)
+                await smtp.starttls()
            
-            await smtp.login(self.smtp_username, self.smtp_password_encrypted)
+            password = decrypt_secret(self.smtp_password)
+            await smtp.login(self.smtp_username, password)
             
             return smtp
-        except Exception as e:
-            print(f"SMTP connection failed: {str(e)}")
-            raise ConnectionError(f"SMTP verification failed: {str(e)}")
+        except Exception as exc:
+            raise ConnectionError("SMTP verification failed.") from exc
+
+    async def test_connection(self: "EmailSMTP"):
+        smtp = await self.get_smtp_connection()
+        await smtp.quit()
 
 
     def build_message(self:"EmailSMTP", client:dict, message_template:"MessageTemplate"):

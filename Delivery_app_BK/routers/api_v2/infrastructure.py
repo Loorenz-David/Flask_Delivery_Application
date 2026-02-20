@@ -71,7 +71,7 @@ def list_vehicles():
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def create_vehicle():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,
@@ -93,7 +93,7 @@ def create_vehicle():
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def update_vehicle():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,
@@ -115,7 +115,7 @@ def update_vehicle():
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def delete_vehicle():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,
@@ -179,7 +179,7 @@ def list_warehouses():
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def create_warehouse():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,
@@ -201,7 +201,7 @@ def create_warehouse():
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def update_warehouse():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,
@@ -223,7 +223,7 @@ def update_warehouse():
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def delete_warehouse():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,

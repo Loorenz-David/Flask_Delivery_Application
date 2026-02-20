@@ -57,7 +57,7 @@ def list_items():
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def create_item():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,
@@ -79,7 +79,7 @@ def create_item():
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def update_item():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,
@@ -101,7 +101,7 @@ def update_item():
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def delete_item():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,

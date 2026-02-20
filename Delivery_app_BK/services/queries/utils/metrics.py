@@ -9,7 +9,7 @@ def calculate_item_totals(items: Iterable[Item]) -> dict:
     total_weight = 0.0
 
     for item in items:
-        quantity = item.quantity
+        quantity = item.quantity or 1
         total_items += quantity
         total_volume += _item_volume_m3(item) * quantity
         total_weight += _item_weight_kg(item) * quantity
@@ -17,7 +17,7 @@ def calculate_item_totals(items: Iterable[Item]) -> dict:
     return {
         "total_items": total_items,
         "total_volume": total_volume,
-        "total_weigth": total_weight,
+        "total_weight": total_weight,
     }
 
 

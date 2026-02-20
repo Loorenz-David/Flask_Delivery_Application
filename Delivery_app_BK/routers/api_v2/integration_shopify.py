@@ -9,10 +9,14 @@ from Delivery_app_BK.services.run_service import run_service
 from Delivery_app_BK.services.commands.integration_shopify.auth import (
     connect_to_shopify_store,
     handle_shopify_oauth_callback,
-    handle_shopify_unisntall
+    handle_shopify_unisntall,
+    remove_shopify_integration,
     )
 from Delivery_app_BK.services.commands.integration_shopify.webhooks import (
     verify_shopify_webhook
+)
+from Delivery_app_BK.services.queries.integration_shopify.get_shopify_details import (
+    get_shopify_details,
 )
 
 
@@ -43,19 +47,58 @@ def connect_shopify():
         outcome.data,
         warnings=ctx.warnings,
     )
+
+
+@shopify_bp.route("/<integration_id>", methods=["GET"])
+@jwt_required()
+def get_shopify_integration(integration_id: str):
+    identity = get_jwt()
+    ctx = ServiceContext(
+        identity=identity,
+    )
+    outcome = run_service(lambda c: get_shopify_details(c, integration_id), ctx)
+    response = Response()
+
+    if outcome.error:
+        return response.build_unsuccessful_response(outcome.error)
+
+    return response.build_successful_response(
+        outcome.data,
+        warnings=ctx.warnings,
+    )
+
+
+@shopify_bp.route("/<integration_id>", methods=["DELETE"])
+@jwt_required()
+def delete_shopify_integration(integration_id: str):
+    identity = get_jwt()
+    ctx = ServiceContext(
+        identity=identity,
+    )
+    outcome = run_service(lambda c: remove_shopify_integration(c, integration_id), ctx)
+    response = Response()
+
+    if outcome.error:
+        return response.build_unsuccessful_response(outcome.error)
+
+    return response.build_successful_response(
+        {},
+        warnings=ctx.warnings,
+    )
+    
    
 # OAuth callback is unauthenticated; user binding is resolved via OAuth state
 @shopify_bp.route("/oauth/callback", methods=["GET"])
 def shopify_oauth_callback():
     ctx = ServiceContext()
-
+    response = Response()
     outcome = run_service(
         lambda c: handle_shopify_oauth_callback(c, request.args.to_dict()),
         ctx
     )
-
+   
     if outcome.error:
-        return "Shopify OAuth failed", 400
+        return response.build_unsuccessful_response(error= outcome.error)
 
     return redirect(outcome.data["redirect_url"])
 
@@ -96,4 +139,22 @@ def shopify_app_uninstalled():
     except Exception:
         pass
 
+    return "", 200
+
+
+@shopify_bp.route("/gdpr/customers/data_request", methods=["POST"])
+def gdpr_data_request():
+    verify_shopify_webhook(request.data, request.headers)
+    return "", 200
+
+
+@shopify_bp.route("/gdpr/customers/redact", methods=["POST"])
+def gdpr_customer_redact():
+    verify_shopify_webhook(request.data, request.headers)
+    return "", 200
+
+
+@shopify_bp.route("/gdpr/shop/redact", methods=["POST"])
+def gdpr_shop_redact():
+    verify_shopify_webhook(request.data, request.headers)
     return "", 200

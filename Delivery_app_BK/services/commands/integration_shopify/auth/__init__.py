@@ -6,4 +6,7 @@ from .oauth_callback import (
 )
 from .save_shopify_integration import save_shopify_integration
 
-from .remove_shopify_integration import handle_shopify_unisntall
+from .remove_shopify_integration import (
+    handle_shopify_unisntall,
+    remove_shopify_integration
+)

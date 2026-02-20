@@ -2,13 +2,14 @@
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy import Index, text, JSON
 from sqlalchemy.orm import relationship
-from sqlalchemy import Column, Integer, Text, String, Boolean, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, Text, String, Boolean, ForeignKey
 
 from datetime import datetime, timezone
 
 # Local application imports
 from Delivery_app_BK.models import db
 from Delivery_app_BK.models.mixins.team_mixings.team_id import TeamScopedMixin
+from Delivery_app_BK.models.utils import UTCDateTime
 
 
 class NotificationRead( db.Model ):
@@ -18,7 +19,7 @@ class NotificationRead( db.Model ):
 
     reader_name = Column( String )
     seen_at = Column(
-        DateTime(timezone=True),
+        UTCDateTime,
         default= lambda: datetime.now(timezone.utc),
         nullable = False
     )
@@ -29,12 +30,12 @@ class NotificationRead( db.Model ):
         nullable= True
     )
 
-    order_chat_id = Column(
+    case_chat_id = Column(
         Integer,
-        ForeignKey("order_chat.id", ondelete="CASCADE")
+        ForeignKey("case_chat.id", ondelete="CASCADE")
     )
 
-    order_chat = relationship(
-        "OrderChat",
+    case_chat = relationship(
+        "CaseChat",
         back_populates = "notification_reads"
     )

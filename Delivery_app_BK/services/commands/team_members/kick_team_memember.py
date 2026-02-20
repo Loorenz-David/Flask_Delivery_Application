@@ -12,7 +12,7 @@ def kick_team_memember(ctx: ServiceContext, user_id: int):
         raise ValidationFailed("User id is required to remove a team member.")
 
     user: User = get_instance(ctx, User, user_id)
-
+  
     if user.old_team_id is None or user.old_role_id is None:
         raise ValidationFailed("User has no previous team or role to return to.")
 

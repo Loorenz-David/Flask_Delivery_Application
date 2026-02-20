@@ -16,14 +16,14 @@ def serialize_optimizations(instances: Type[Model], ctx: ServiceContext):
             stops_by_order[stop.order_id] = {
                 "id": stop.id,
                 "client_id": stop.client_id,
-                "route_optimization_id": stop.route_optimization_id,
+                "route_solution_id": stop.route_solution_id,
                 "order_id": stop.order_id,
                 "waiting_time": stop.waiting_time,
                 "in_range": stop.in_range,
                 "stop_order": stop.stop_order,
                 "delivery_after": stop.delivery_after,
                 "delivery_before": stop.delivery_before,
-                "expected_arrival_time": stop.expected_arrival_time,
+                "expected_arrival_time": _serialize_datetime(stop.expected_arrival_time),
                 "actual_arrival_time": stop.actual_arrival_time,
                 "team_id": stop.team_id,
             }
@@ -36,10 +36,16 @@ def serialize_optimizations(instances: Type[Model], ctx: ServiceContext):
             "score": instance.score,
             "created_at": created_at.isoformat() if created_at else None,
             "is_selected": instance.is_selected,
-            "delivery_plan_id": instance.delivery_plan_id,
+            "local_delivery_plan_id": instance.local_delivery_plan_id,
             "team_id": instance.team_id,
             "stops": stops_by_order,
         }
         unpacked_instances.append(unpacked)
 
-    return map_return_values(unpacked_instances, ctx, "route_optimization")
+    return map_return_values(unpacked_instances, ctx, "route_solution")
+
+
+def _serialize_datetime(value):
+    if not value:
+        return None
+    return value.isoformat()

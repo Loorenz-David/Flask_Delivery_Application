@@ -131,11 +131,12 @@ def get_team_invite_received(invite_id: int):
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def create_team_invitation():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,
     )
+
     outcome = run_service(lambda c: create_team_invitation_service(c), ctx)
     response = Response()
 
@@ -160,6 +161,7 @@ def accept_team_invitation(invite_id: int):
         lambda c: accept_team_invitation_service(c, invite_id),
         ctx,
     )
+    
     response = Response()
 
     if outcome.error:

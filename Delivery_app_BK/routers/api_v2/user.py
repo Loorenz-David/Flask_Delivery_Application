@@ -47,7 +47,7 @@ def get_user_profile():
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def update_user_profile():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,

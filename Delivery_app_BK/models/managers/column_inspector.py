@@ -42,11 +42,12 @@ class ColumnInspector:
 
             # if the given column is a relationship it will get it and skipped the assignment to self.column
             self.relationship = self.get_relationship()
+
             if not self.is_relationship():
                 self.column = self.get_column_instance()
                 self.column_type = self.get_python_type()
             else:
-                self.column_type = self.get_python_type()
+                self.column_type = None
 
     
     # checks if the column holds any foreign keys
@@ -114,9 +115,11 @@ class ColumnInspector:
             return None
 
         # use for JSONB and JSON columns as the type is read as dict in python
+   
         if self.column_type is dict:
-            if isinstance(value, dict):
+            if isinstance(value, (dict, list)):
                 return value
+
             raise ValidationFailed(
                 f"Invalid value for '{self.column_name}'. Expected a JSON object."
             )
@@ -126,8 +129,11 @@ class ColumnInspector:
                 return value
             if isinstance(value, str):
                 try:
+
                     # Handles both Python and JS ISO formats
-                    return datetime.fromisoformat(value).replace(tzinfo=timezone.utc)
+                    date = datetime.fromisoformat(value).replace(tzinfo=timezone.utc)
+
+                    return date
                 except ValueError:
                     raise ValidationFailed(
                         f"Invalid datetime format for '{self.column_name}'."

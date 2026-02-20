@@ -18,6 +18,7 @@ SHOPIFY_CLIENT_ID = os.getenv("SHOPIFY_CLIENT_ID")
 SHOPIFY_CLIENT_SECRET = os.getenv("SHOPIFY_CLIENT_SECRET")
 SHOPIFY_FRONTEND_URL = os.getenv("FRONTEND_ORIGIN")
 BACKEND_PUBLIC_URL = os.getenv("BACKEND_PUBLIC_URL")
+FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN")
 
 def verify_shopify_hmac(params: dict):
     
@@ -135,7 +136,8 @@ def handle_shopify_oauth_callback(ctx: ServiceContext, params):
     # 4. Return frontend redirect
     return {
         "redirect_url": (
-            f"{BACKEND_PUBLIC_URL}/api_v2/shopify/app"
-            f"?status=connected&shop={shop}&embedded=1&host={host}"         
+            f"{FRONTEND_ORIGIN}/settings/integrations/status"
+            f"?integration=shopify&status=connected&shop={shop}&embedded=1&host={host}"         
         )
     }
+

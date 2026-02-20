@@ -25,6 +25,9 @@ from Delivery_app_BK.services.commands.team_members.kick_team_memember import (
 from Delivery_app_BK.services.commands.team_members.change_memeber_user_role import (
     change_memeber_user_role as change_memeber_user_role_service,
 )
+from Delivery_app_BK.services.commands.team.update_team_name import (
+    update_team_name as update_team_name_service
+)
 
 
 team_bp = Blueprint("api_v2_team_bp", __name__)
@@ -117,12 +120,34 @@ def kick_team_memember(user_id: int):
 @role_required([ADMIN, ASSISTANT, DRIVER])
 def change_memeber_user_role():
     identity = get_jwt()
-    incoming_data = request.get_json(silent=True)
+    incoming_data = request.get_json(silent=True) or {}
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,
     )
     outcome = run_service(lambda c: change_memeber_user_role_service(c), ctx)
+    response = Response()
+
+    if outcome.error:
+        return response.build_unsuccessful_response(outcome.error)
+
+    return response.build_successful_response(
+        {},
+        warnings=ctx.warnings,
+    )
+
+
+@team_bp.route("/change-name", methods=["POST"])
+@jwt_required()
+@role_required([ADMIN, ASSISTANT, DRIVER])
+def change_team_name():
+    identity = get_jwt()
+    incoming_data = request.get_json(silent=True) or {}
+    ctx = ServiceContext(
+        incoming_data=incoming_data,
+        identity=identity,
+    )
+    outcome = run_service(lambda c: update_team_name_service(c), ctx)
     response = Response()
 
     if outcome.error:

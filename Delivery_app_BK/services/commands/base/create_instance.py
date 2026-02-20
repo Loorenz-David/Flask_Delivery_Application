@@ -30,7 +30,7 @@ def create_instance(
 
     state = inspect(new_instance)
 
-    print(fields)
+
     inject_fields( 
         ctx,
         new_instance,

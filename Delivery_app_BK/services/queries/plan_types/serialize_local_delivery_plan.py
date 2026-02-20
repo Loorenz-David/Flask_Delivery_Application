@@ -9,7 +9,6 @@ def serialize_local_delivery_plan(instance: LocalDeliveryPlan, ctx: ServiceConte
         "client_id": instance.client_id,
         "actual_start_time": instance.actual_start_time,
         "actual_end_time": instance.actual_end_time,
-        "is_optimized": instance.is_optimized,
         "driver_id": instance.driver_id,
         "delivery_plan_id": instance.delivery_plan_id,
     }]

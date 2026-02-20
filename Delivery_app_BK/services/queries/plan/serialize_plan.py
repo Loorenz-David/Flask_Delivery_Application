@@ -1,6 +1,7 @@
 from typing import Type,List
 from flask_sqlalchemy.model import Model
 from Delivery_app_BK.models import DeliveryPlan
+from datetime import timezone
 
 from ...context import ServiceContext
 from ..utils import map_return_values, calculate_plan_metrics
@@ -14,7 +15,7 @@ def serialize_plans( instances: List[ Type[ DeliveryPlan ] ], ctx:ServiceContext
         start_date = instance.start_date
         end_date = instance.end_date
         created_at = instance.created_at
-
+        print(start_date, end_date, 'the start ')
         unpacked = {
             "id": instance.id,
             "client_id": instance.client_id,
@@ -26,7 +27,7 @@ def serialize_plans( instances: List[ Type[ DeliveryPlan ] ], ctx:ServiceContext
             "state_id": instance.state_id
         }
         unpacked.update(calculate_plan_metrics(instance))
-        
+
         unpacked_instances.append( unpacked )
 
     return map_return_values(unpacked_instances, ctx, "delivery_plan")

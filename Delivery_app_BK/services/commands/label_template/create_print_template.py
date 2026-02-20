@@ -13,6 +13,7 @@ def create_label_template(ctx: ServiceContext):
     instances = []
 
     for field_set in extract_fields(ctx):
+       
         instance = create_instance(ctx, LabelTemplate, dict(field_set))
         instances.append(instance)
 
