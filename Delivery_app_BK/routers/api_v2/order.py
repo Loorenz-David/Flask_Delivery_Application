@@ -263,9 +263,12 @@ def create_order_import():
     identity = get_jwt()
     
     file = request.files.get('file')
+    incoming_data = request.form.to_dict() if request.form else {}
 
     ctx = ServiceContext(
         incoming_file= file,
+        incoming_data=incoming_data,
+        query_params=request.args,
         identity=identity,
         extract_fields_key=False
     )

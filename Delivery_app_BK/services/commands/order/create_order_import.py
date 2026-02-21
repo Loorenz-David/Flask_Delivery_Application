@@ -45,8 +45,9 @@ def _order_import_mapper(row):
     address_obj = _build_address_object(row)
 
     map_order = {
-        "client_id": generate_client_id('order'),
+        "client_id": generate_client_id('order_import_'),
         "external_order_id": _clean_value(row.get("external_order_id")),
+        "external_source":_clean_value(row.get("external_source")) or 'csv_import',
         "reference_number": _clean_value(row.get("order_reference_number")),
         "tracking_number": _clean_value(row.get("tracking_number")),
         "earliest_delivery_date": _clean_value(row.get("earliest_delivery_date")),
@@ -54,7 +55,6 @@ def _order_import_mapper(row):
         "client_first_name": _clean_value(row.get("client_first_name")),
         "client_last_name": _clean_value(row.get("client_last_name")),
         "client_email": _clean_value(row.get("client_email")),
-        "order_state_id": 1,
     }
 
     if phone_obj:
@@ -71,6 +71,7 @@ def _item_import_mapper(row):
         "client_id": generate_client_id('order'),
         "article_number": _clean_value(row.get("article_number")),
         "reference_number": _clean_value(row.get("item_reference_number")),
+        "delivery_plan_id":_parse_int(row.get("delivery_plan_id")) or None,
         "item_type": _clean_value(row.get("item_type")),
         "page_link": _clean_value(row.get("page_link")),
         "quantity": _parse_int(row.get("quantity"), default=1),
@@ -147,6 +148,8 @@ def _build_order_group_key(row):
     order_key_fields = [
         "external_order_id",
         "order_reference_number",
+        "delivery_plan_id",
+        "external_source",
         "tracking_number",
         "earliest_delivery_date",
         "latest_delivery_date",
@@ -165,6 +168,16 @@ def _build_order_group_key(row):
 
 def create_order_import( ctx:ServiceContext  ):
     file:FileStorage = ctx.incoming_file
+    delivery_plan_id = None
+
+    if ctx.query_params:
+        delivery_plan_id = ctx.query_params.get("delivery_plan_id")
+
+    if not delivery_plan_id and ctx.incoming_data:
+        delivery_plan_id = ctx.incoming_data.get("delivery_plan_id")
+
+    if delivery_plan_id is not None:
+        delivery_plan_id = str(delivery_plan_id).strip() or None
 
     _validate_file(file, ctx)
 
@@ -179,9 +192,15 @@ def create_order_import( ctx:ServiceContext  ):
 
     for index, row in enumerate(reader, start=2):
         try:
-            order_key = _build_order_group_key(row)
+            group_row = dict(row)
+            order_key = _build_order_group_key(group_row)
+
             if order_key != last_order_key:
                 current_order = _order_import_mapper(row)
+                if delivery_plan_id:
+                    parsed_plan_id = _parse_int(delivery_plan_id)
+                    if parsed_plan_id is not None:
+                        current_order["delivery_plan_id"] = parsed_plan_id
                 current_order["items"] = []
                 orders.append(current_order)
                 last_order_key = order_key
@@ -193,7 +212,8 @@ def create_order_import( ctx:ServiceContext  ):
             ctx.set_warning(f"Row {index}: {str(e)}")
 
     ctx.incoming_data = orders
-
+    from pprint import pprint
+    pprint(orders)
     result = create_order(ctx)
 
     return result
