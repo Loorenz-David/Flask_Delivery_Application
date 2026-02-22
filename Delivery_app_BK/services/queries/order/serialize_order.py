@@ -43,6 +43,9 @@ def serialize_orders( instances: List[ Order ], ctx:ServiceContext  ):
             "delivery_plan_id": instance.delivery_plan_id,
             "open_order_cases": _count_open_order_cases(instance),
         }
+        if instance.archive_at is not None:
+            unpacked['archive_at'] = instance.archive_at
+            
         unpacked.update(calculate_order_metrics(instance))
         unpacked_instances.append( unpacked )
 

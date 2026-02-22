@@ -74,7 +74,9 @@ class Order(
         ForeignKey("delivery_plan.id", ondelete="SET NULL"), 
     )
 
+    archive_at = Column(UTCDateTime)
     
+  
 
     # delivery_items has change to items, there is a lot of the fornt end that needs to be updated!
     items = db.relationship(

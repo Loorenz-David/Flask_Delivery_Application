@@ -27,6 +27,11 @@ def find_orders (
     if "team_id" in params:
         query = query.filter( Order.team_id == params.get( "team_id" ) )
 
+    if "show_archived" in params and str_to_bool(params["show_archived"]):
+        query = query.filter(Order.archive_at.isnot(None))
+    else:
+        query = query.filter(Order.archive_at.is_(None))
+
     string_filter_map = {
         # ---------------- ORDER FIELDS ----------------
         "reference_number": {
@@ -144,10 +149,9 @@ def find_orders (
 
 
     if "schedule_order" in params:
-        if str_to_bool(params["schedule_order"]):
-            query = query.filter(Order.delivery_plan_id.isnot(None))
-        else:
-            query = query.filter(Order.delivery_plan_id.is_(None))
+        query = query.filter(Order.delivery_plan_id.isnot(None))
+    if "unschedule_order" in params:
+        query = query.filter(Order.delivery_plan_id.is_(None))
             
 
     if "earliest_delivery_date" in params:

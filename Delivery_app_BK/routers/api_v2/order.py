@@ -38,6 +38,12 @@ from Delivery_app_BK.services.commands.order_states.update_orders_state import (
 from Delivery_app_BK.services.queries.item.list_items import (
     list_items as list_items_service,
 )
+from Delivery_app_BK.services.commands.order.archive_order import (
+    archive_order as archive_order_service
+)
+from Delivery_app_BK.services.commands.order.unarchive_order import (
+    unarchive_order as unarchive_order_service
+)
 
 
 order_bp = Blueprint("api_v2_order_bp", __name__)
@@ -281,5 +287,55 @@ def create_order_import():
 
     return response.build_successful_response(
         outcome.data,
+        warnings=ctx.warnings,
+    )
+
+
+@order_bp.route("/archive", methods=["PATCH"])
+@jwt_required()
+@role_required([ADMIN, ASSISTANT, DRIVER])
+def archive_order():
+    identity = get_jwt()
+    incoming_data = request.get_json(silent=True) or {}
+    prevent_event_bus = incoming_data.pop("prevent_event_bus", True)
+    ctx = ServiceContext(
+        incoming_data=incoming_data,
+        identity=identity,
+        prevent_event_bus = prevent_event_bus 
+    )
+    outcome = run_service(lambda c: archive_order_service(c), ctx)
+    response = Response()
+
+    if outcome.error:
+        return response.build_unsuccessful_response(outcome.error)
+
+    return response.build_successful_response(
+        {},
+        warnings=ctx.warnings,
+    )
+
+
+@order_bp.route("/unarchive", methods=["PATCH"])
+@jwt_required()
+@role_required([ADMIN, ASSISTANT, DRIVER])
+def unarchive_order():
+    identity = get_jwt()
+    incoming_data = request.get_json(silent=True) or {}
+    prevent_event_bus = incoming_data.pop("prevent_event_bus", True)
+
+    ctx = ServiceContext(
+        incoming_data=incoming_data,
+        identity=identity,
+        prevent_event_bus=prevent_event_bus,
+    )
+
+    outcome = run_service(lambda c: unarchive_order_service(c), ctx)
+    response = Response()
+
+    if outcome.error:
+        return response.build_unsuccessful_response(outcome.error)
+
+    return response.build_successful_response(
+        {},
         warnings=ctx.warnings,
     )
