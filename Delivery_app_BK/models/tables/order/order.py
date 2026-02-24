@@ -111,6 +111,8 @@ class Order(
         "OrderCase",
         back_populates="order",
         lazy="selectin",
+        cascade="all, delete-orphan",
+        passive_deletes=True
     )
 
     delivery_plan = relationship(

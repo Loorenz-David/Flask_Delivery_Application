@@ -38,6 +38,13 @@ class ServiceContext():
     def set_relationship_map( self, map ):
         self.relationship_map = map
         return self
+    
+    def upsert_relationship_map( self, map):
+        self.relationsip_map = {
+            ** self.relationship_map,
+            **map
+        }
+        return self
 
     @property
     def team_id( self ):

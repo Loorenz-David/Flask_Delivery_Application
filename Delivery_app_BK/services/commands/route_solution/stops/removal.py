@@ -9,6 +9,17 @@ def remove_order_stops_for_local_delivery(
     order_id: int,
     local_delivery_plan_id: int,
 ) -> tuple[list[RouteSolutionStop], list[RouteSolution]]:
+    return remove_orders_stops_for_local_delivery([order_id], local_delivery_plan_id)
+
+
+def remove_orders_stops_for_local_delivery(
+    order_ids: list[int],
+    local_delivery_plan_id: int,
+) -> tuple[list[RouteSolutionStop], list[RouteSolution]]:
+    if not order_ids:
+        return [], []
+
+    deduped_order_ids = list(dict.fromkeys(order_ids))
     route_solution_ids = [
         row[0]
         for row in db.session.query(RouteSolution.id)
@@ -20,7 +31,7 @@ def remove_order_stops_for_local_delivery(
 
     stops = (
         db.session.query(RouteSolutionStop)
-        .filter(RouteSolutionStop.order_id == order_id)
+        .filter(RouteSolutionStop.order_id.in_(deduped_order_ids))
         .filter(RouteSolutionStop.route_solution_id.in_(route_solution_ids))
         .all()
     )

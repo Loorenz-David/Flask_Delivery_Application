@@ -40,9 +40,7 @@ def inject_fields(
 
     with db.session.no_autoflush:
         for field, value in fields.items():
-            print('Debugging: ', 'field, value')
-            print(field, value)
-            print('-------------')
+         
             if ctx.skip_id_instance_injection:
                 if field == 'id':
                     ctx.set_warning(f'The provided id was ignore because the current context does not allow ID injection')
@@ -53,12 +51,12 @@ def inject_fields(
           
             # if the column holds a foreign key, it will link using the foreign key
             if column_inspector.is_foreign_key():
-
+               
                 related_model = (
                     ctx.relationship_map.get( column_inspector.column_name )
                     or column_inspector.get_related_model()
                     )
-            
+                
                 if related_model is None:
                     raise ValidationFailed(
                         f"Missing relationship mapping for '{column_inspector.column_name}'."
