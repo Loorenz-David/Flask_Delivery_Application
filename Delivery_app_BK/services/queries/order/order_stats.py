@@ -30,7 +30,7 @@ def order_stats(query: Query, ctx: ServiceContext):
 
     # --- Item count (no duplicate join issue anymore) ---
     item_count = (
-        db.session.query(func.count(Item.id))
+        db.session.query(func.coalesce(func.sum(Item.quantity), 0))
         .join(order_subquery, Item.order_id == order_subquery.c.id)
         .scalar()
     )
