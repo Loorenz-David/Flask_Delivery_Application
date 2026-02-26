@@ -36,7 +36,7 @@ def plan_stats( query:Query, ctx:ServiceContext ):
         query
         .join( Order, Order.delivery_plan_id == DeliveryPlan.id )
         .join( Item, Item.order_id == Order.id )
-        .with_entities( distinct( func.count( Item.id ) ) )
+        .with_entities( func.coalesce(func.sum(Item.quantity), 0))
         .scalar()
     )
 

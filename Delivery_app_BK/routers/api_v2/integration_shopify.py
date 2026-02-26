@@ -1,4 +1,4 @@
-
+import os
 from flask import Blueprint, request, redirect, render_template
 from flask_jwt_extended import jwt_required, get_jwt
 
@@ -24,6 +24,7 @@ from ..http.response import Response
 
 shopify_bp = Blueprint("api_v2_integration_shopify", __name__)
 
+FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN")
 
 
 
@@ -113,7 +114,8 @@ def shopify_app_home():
                            shop=shop,
                            host=host,
                            embedded=embedded,
-                           status=status
+                           status=status,
+                           front_url=FRONTEND_ORIGIN
                            )
 
 

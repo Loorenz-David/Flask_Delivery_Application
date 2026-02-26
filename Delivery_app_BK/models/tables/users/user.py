@@ -15,7 +15,7 @@ from Delivery_app_BK.models.mixins.validation_mixins.address_validation import (
     AddressJSONValidationMixin
 )
 
-from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash 
 
 
 class User(
