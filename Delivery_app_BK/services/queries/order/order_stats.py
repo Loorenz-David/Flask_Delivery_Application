@@ -5,33 +5,48 @@ from ...context import ServiceContext
 
 
 def order_stats(query: Query, ctx: ServiceContext):
-    # Remove ordering & pagination
+    # --------------------------------------------------
+    # Remove ordering & pagination (stats must ignore it)
+    # --------------------------------------------------
     base_query = query.order_by(None).limit(None).offset(None)
 
-    # Convert to subquery of order ids only
-    order_subquery = base_query.with_entities(Order.id).subquery()
+    # --------------------------------------------------
+    # Build DISTINCT order id subquery (safeguard joins)
+    # --------------------------------------------------
+    order_ids_subq = (
+        base_query
+        .with_entities(distinct(Order.id).label("id"))
+        .subquery()
+    )
 
-    # --- Order counts ---
+    # --------------------------------------------------
+    # Total orders
+    # --------------------------------------------------
     total_orders = (
         db.session.query(func.count())
-        .select_from(order_subquery)
+        .select_from(order_ids_subq)
         .scalar()
     )
 
+    # --------------------------------------------------
+    # Orders grouped by state
+    # --------------------------------------------------
     state_count = (
         db.session.query(
             Order.order_state_id,
-            func.count(distinct(Order.id))
+            func.count()
         )
-        .join(order_subquery, Order.id == order_subquery.c.id)
+        .join(order_ids_subq, Order.id == order_ids_subq.c.id)
         .group_by(Order.order_state_id)
         .all()
     )
 
-    # --- Item count (no duplicate join issue anymore) ---
+    # --------------------------------------------------
+    # Total item quantity (safe from duplicate joins)
+    # --------------------------------------------------
     item_count = (
         db.session.query(func.coalesce(func.sum(Item.quantity), 0))
-        .join(order_subquery, Item.order_id == order_subquery.c.id)
+        .join(order_ids_subq, Item.order_id == order_ids_subq.c.id)
         .scalar()
     )
 

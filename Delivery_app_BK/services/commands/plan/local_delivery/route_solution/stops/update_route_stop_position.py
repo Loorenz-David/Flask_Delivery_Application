@@ -1,4 +1,4 @@
-from typing import List
+from typing import Any, List
 from datetime import datetime, timezone
 
 from Delivery_app_BK.errors import ValidationFailed, NotFound
@@ -52,6 +52,7 @@ def update_route_stop_position(
 
 
     _is_route_solution_end_date_valid(route_solution)
+    _validate_route_solution_orders_have_coordinates(route_solution)
     
 
     original_route_solution = None
@@ -129,6 +130,8 @@ def update_route_stop_position(
             orders_by_id=orders_by_id,
             recompute_from_position=affected_start_position,
         )
+    except ValidationFailed:
+        raise
     except Exception as exc:
         _mark_suffix_as_stale(route_solution, affected_start_position)
         refreshed_stops = []
@@ -181,6 +184,56 @@ def _orders_by_id_for_route_solution(route_solution: RouteSolution) -> dict[int,
         for order in (delivery_plan.orders or [])
         if getattr(order, "id", None) is not None
     }
+
+
+def _validate_route_solution_orders_have_coordinates(route_solution: RouteSolution) -> None:
+    orders_by_id = _orders_by_id_for_route_solution(route_solution)
+    invalid_order_ids: list[int] = []
+    invalid_order_client_ids: list[str] = []
+
+    seen_order_ids: set[int] = set()
+    for stop in (route_solution.stops or []):
+        order_id = getattr(stop, "order_id", None)
+        if order_id is None or order_id in seen_order_ids:
+            continue
+        seen_order_ids.add(order_id)
+
+        order = orders_by_id.get(order_id)
+        order_client_id = getattr(order, "client_id", None) if order else None
+        location = getattr(order, "client_address", None) if order else None
+        if _coordinates_from_location(location) is None:
+            invalid_order_ids.append(order_id)
+            if order_client_id:
+                invalid_order_client_ids.append(str(order_client_id))
+
+    if invalid_order_ids:
+        client_ids_suffix = (
+            f" client_ids={sorted(set(invalid_order_client_ids))}"
+            if invalid_order_client_ids
+            else ""
+        )
+        raise ValidationFailed(
+            "Cannot reorder route stop: missing valid coordinates for orders "
+            f"{sorted(invalid_order_ids)}.{client_ids_suffix}"
+        )
+
+
+def _coordinates_from_location(location: dict[str, Any] | None) -> tuple[float, float] | None:
+    if not location:
+        return None
+    candidate = location.get("coordinates", location)
+    if not isinstance(candidate, dict):
+        return None
+
+    lat = candidate.get("lat") or candidate.get("latitude")
+    lng = candidate.get("lng") or candidate.get("longitude")
+    if lat is None or lng is None:
+        return None
+
+    try:
+        return float(lat), float(lng)
+    except (TypeError, ValueError):
+        return None
 
 
 def _dedupe_and_sort_stops(stops: list[RouteSolutionStop]) -> list[RouteSolutionStop]:
