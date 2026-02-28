@@ -62,3 +62,7 @@ class ServiceContext():
     @property
     def base_role_id ( self ):
         return self.identity.get( "base_role_id" )
+
+    @property
+    def time_zone(self):
+        return self.identity.get("time_zone")

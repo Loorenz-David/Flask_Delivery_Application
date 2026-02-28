@@ -35,7 +35,16 @@ class DirectionsStopResult:
 class DirectionsResult:
     total_distance_meters: int
     total_duration_seconds: int
-    polyline: Optional[List[str]]
+    leg_polylines: List[Optional[str]]
     start_time: Optional[datetime]
     end_time: Optional[datetime]
     stop_results: List[DirectionsStopResult] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class DirectionsRequestBuildResult:
+    request: DirectionsRequest
+    full_recompute: bool
+    effective_start_position: int
+    anchor_order_id: Optional[int] = None
+    affected_order_ids: List[int] = field(default_factory=list)

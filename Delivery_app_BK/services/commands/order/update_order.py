@@ -2,39 +2,58 @@ from datetime import datetime
 from typing import Any
 from sqlalchemy.orm.exc import NoResultFound
 
+from Delivery_app_BK.errors import ValidationFailed
 from Delivery_app_BK.models import (
     db,
     Order,
-    DeliveryPlan,
-    Team,
-    OrderState,
 )
-from Delivery_app_BK.services.utils import to_datetime
+from Delivery_app_BK.services.infra.events.builders.order import (
+    build_delivery_window_rescheduled_by_user_event,
+)
+from Delivery_app_BK.services.infra.events.emiters.order import emit_order_events
+from Delivery_app_BK.services.utils import model_requires_team, require_team_id, to_datetime
 from ...context import ServiceContext
-from ...domain.order.order_events import OrderEvent
-from ...queries.get_instance import get_instance
 from ..utils import extract_targets
 from ..utils.inject_fields import inject_fields
-from .event_emitter import emit_order_events
 
 
-RELATIONSHIP_KEYS = {
-    "items",
-    "order_cases",
+FORBIDDEN_FIELD_KEYS = {
+    "order_state_id",
+    "delivery_plan_id",
+}
+
+FORBIDDEN_RELATIONSHIP_KEYS = {
     "state",
+    "order_state",
     "state_history",
     "delivery_plan",
-    "team",
+}
+
+MUTABLE_FIELDS = {
+    "order_plan_objective",
+    "reference_number",
+    "external_order_id",
+    "external_source",
+    "tracking_number",
+    "tracking_link",
+    "client_first_name",
+    "client_last_name",
+    "client_email",
+    "client_primary_phone",
+    "client_secondary_phone",
+    "client_address",
+    "marketing_messages",
+    "earliest_delivery_date",
+    "latest_delivery_date",
+    "preferred_time_start",
+    "preferred_time_end",
 }
 
 
 def update_order(ctx: ServiceContext):
-    ctx.set_relationship_map( {
-        "team_id":Team,
-        "order_state_id": OrderState,
-        "delivery_plan_id": DeliveryPlan,
-    })
+    ctx.set_relationship_map({})
     targets = extract_targets(ctx)
+    _validate_targets_update_fields(targets)
     instances, pending_events = apply_order_updates(ctx, targets)
     db.session.commit()
     emit_order_events(ctx, pending_events)
@@ -46,63 +65,63 @@ def apply_order_updates(
     targets: list[dict[str, Any]],
 ) -> tuple[list[int], list[dict[str, Any]]]:
     
-   
-    from pprint import pprint
-    print('rel map')
-    pprint(ctx.relationship_map)
-    instances: list[int] = []
+    updated_order_ids: list[int] = []
     pending_events: list[dict[str, Any]] = []
     existing_orders = _resolve_orders_by_targets(ctx, targets)
 
-    for target in targets:
-        target_id = target["target_id"]
+    for order_target in targets:
+        target_id = order_target["target_id"]
         existing: Order = existing_orders[target_id]
-        # Reuse team-safety checks without triggering another DB query.
-        get_instance(ctx, Order, existing)
 
-        old_earliest: datetime = existing.earliest_delivery_date
-        old_latest: datetime = existing.latest_delivery_date
-        old_plan_id = existing.delivery_plan_id
+        old_earliest: datetime = to_datetime(existing.earliest_delivery_date)
+        old_latest: datetime = to_datetime(existing.latest_delivery_date)
 
-        fields = dict(target["fields"] or {})
-        for key in RELATIONSHIP_KEYS:
-            fields.pop(key, None)
+        fields_to_apply = _build_mutable_fields(order_target["fields"])
+        if fields_to_apply:
+            inject_fields(ctx, existing, fields_to_apply)
 
-        inject_fields(ctx, existing, fields)
-        instances.append(existing.id)
+        updated_order_ids.append(existing.id)
 
         new_earliest = to_datetime(existing.earliest_delivery_date)
         new_latest = to_datetime(existing.latest_delivery_date)
 
         if old_earliest != new_earliest or old_latest != new_latest:
             pending_events.append(
-                {
-                    "order_id": existing.id,
-                    "event_name": OrderEvent.DELIVERY_WINDOW_RESCHEDULED_BY_USER.value,
-                    "payload": {
-                        "old_earliest_delivery_date": old_earliest.isoformat() if old_earliest else None,
-                        "old_latest_delivery_date": old_latest.isoformat() if old_latest else None,
-                        "new_earliest_delivery_date": new_earliest.isoformat() if new_earliest else None,
-                        "new_latest_delivery_date": new_latest.isoformat() if new_latest else None,
-                    },
-                    "team_id": existing.team_id,
-                }
+                build_delivery_window_rescheduled_by_user_event(
+                    order_instance=existing,
+                    old_earliest=old_earliest,
+                    old_latest=old_latest,
+                    new_earliest=new_earliest,
+                    new_latest=new_latest,
+                )
             )
 
-        if old_plan_id != existing.delivery_plan_id:
-            pending_events.append(
-                {
-                    "order_id": existing.id,
-                    "event_name": OrderEvent.DELIVERY_PLAN_CHANGED.value,
-                    "payload": {
-                        "old_delivery_plan_id": old_plan_id,
-                        "new_delivery_plan_id": existing.delivery_plan_id,
-                    },
-                    "team_id": existing.team_id,
-                }
+    return updated_order_ids, pending_events
+
+
+def _validate_targets_update_fields(targets: list[dict[str, Any]]) -> None:
+    for target in targets:
+        target_id = target["target_id"]
+        fields = target.get("fields") or {}
+        field_keys = set(fields.keys())
+
+        forbidden_keys = sorted(
+            field_keys & (FORBIDDEN_FIELD_KEYS | FORBIDDEN_RELATIONSHIP_KEYS)
+        )
+        if forbidden_keys:
+            raise ValidationFailed(
+                f"Target '{target_id}' contains forbidden fields for this endpoint: {forbidden_keys}"
             )
 
-    return instances, pending_events
+        unsupported_keys = sorted(field_keys - MUTABLE_FIELDS)
+        if unsupported_keys:
+            raise ValidationFailed(
+                f"Target '{target_id}' contains unsupported fields for this endpoint: {unsupported_keys}"
+            )
+
+
+def _build_mutable_fields(raw_fields: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in raw_fields.items() if key in MUTABLE_FIELDS}
 
 
 def _resolve_orders_by_targets(
@@ -115,13 +134,23 @@ def _resolve_orders_by_targets(
 
     orders_by_id: dict[int, Order] = {}
     orders_by_client_id: dict[str, Order] = {}
+    team_id = None
+
+    if model_requires_team(Order) and ctx.check_team_id:
+        team_id = require_team_id(ctx)
 
     if int_ids:
-        for order in db.session.query(Order).filter(Order.id.in_(int_ids)).all():
+        query = db.session.query(Order).filter(Order.id.in_(int_ids))
+        if team_id is not None:
+            query = query.filter(Order.team_id == team_id)
+        for order in query.all():
             orders_by_id[order.id] = order
 
     if client_ids:
-        for order in db.session.query(Order).filter(Order.client_id.in_(client_ids)).all():
+        query = db.session.query(Order).filter(Order.client_id.in_(client_ids))
+        if team_id is not None:
+            query = query.filter(Order.team_id == team_id)
+        for order in query.all():
             orders_by_client_id[order.client_id] = order
 
     resolved: dict[int | str, Order] = {}

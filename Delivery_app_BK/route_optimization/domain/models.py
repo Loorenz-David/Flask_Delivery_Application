@@ -75,7 +75,7 @@ class OptimizationResult:
     expected_end_time: Optional[str]
     stops: List[StopResult]
     skipped: List[SkippedShipment]
-    route_polyline: Optional[List[str]] = None
+    transition_polylines: Optional[List[Optional[str]]] = None
 
 
 @dataclass(frozen=True)

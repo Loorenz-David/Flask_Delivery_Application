@@ -63,16 +63,17 @@ The React client (in `../Front_end/delivery-app-front`) uses `VITE_API_BASE_URL`
 ## Auth Workflow
 There is no user-registration route yet. Seed at least one record in the `User` table (manually or via a database client) to exercise the token endpoints.
 
-- `POST /auth/login`  
+- `POST /api_v2/auths/login`  
   ```json
   {
     "email": "driver@example.com",
-    "password": "secretpass"
+    "password": "secretpass",
+    "time_zone": "Europe/Stockholm"
   }
   ```  
-  Returns `access_token`, `refresh_token`, and minimal user data when the credentials match an existing row.
+  Returns `access_token`, `refresh_token`, and minimal user data when the credentials match an existing row. Tokens include the `time_zone` claim.
 
-- `POST /auth/refresh_token`  
+- `POST /api_v2/auths/refresh_token`  
   Requires a valid refresh token in the `Authorization: Bearer` header and returns a new access token.
 
 Custom JWT error handlers in `routers/auth_routers/utils/jwt_handler.py` standardise JSON responses for common token failures.

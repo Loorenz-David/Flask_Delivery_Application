@@ -26,6 +26,7 @@ def serialize_route_solution_stops(instances: List[RouteSolutionStop], ctx: Serv
                 "eta_status": instance.eta_status,
                 "expected_arrival_time": expected_arrival_time.isoformat() if expected_arrival_time else None,
                 "actual_arrival_time": instance.actual_arrival_time,
+                "to_next_polyline": instance.to_next_polyline,
             }
         )
 

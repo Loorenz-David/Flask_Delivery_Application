@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from Delivery_app_BK.route_optimization.constants.is_optimized import (
     IS_OPTIMIZED_OPTIMIZE,
 )
@@ -31,8 +31,8 @@ def persist_solution(
     route_solution.total_travel_time_seconds = result.total_duration_seconds
     route_solution.expected_start_time = _parse_datetime(result.expected_start_time)
     route_solution.expected_end_time = _parse_datetime(result.expected_end_time)
-    if request.populate_transition_polylines:
-        route_solution.route_polyline = result.route_polyline
+    route_solution.start_leg_polyline = None
+    route_solution.end_leg_polyline = None
 
     route_solution.start_location = request.start_location
     route_solution.end_location = request.end_location
@@ -45,6 +45,7 @@ def persist_solution(
     stop_payloads: List[Dict[str, Any]] = []
     skipped_payloads: List[Dict[str, Any]] = []
     payload_refs: List[tuple[Dict[str, Any], RouteSolutionStop]] = []
+    routed_stop_instances: list[RouteSolutionStop] = []
 
     for stop in result.stops:
         stop_instance = stop_lookup.get(stop.order_id)
@@ -66,6 +67,8 @@ def persist_solution(
         stop_instance.eta_status = "valid"
         stop_instance.has_constraint_violation = False
         stop_instance.constraint_warnings = None
+        stop_instance.to_next_polyline = None
+        routed_stop_instances.append(stop_instance)
         payload = {
             "id": stop_instance.id,
             "client_id": stop_instance.client_id,
@@ -77,7 +80,8 @@ def persist_solution(
             "reason_was_skipped": stop_instance.reason_was_skipped,
             "route_solution_id": route_solution.id,
             "has_constraint_violation": stop_instance.has_constraint_violation,
-            "constraint_warnings":stop_instance.constraint_warnings
+            "constraint_warnings":stop_instance.constraint_warnings,
+            "to_next_polyline": stop_instance.to_next_polyline,
 
         }
         stop_payloads.append(payload)
@@ -108,6 +112,7 @@ def persist_solution(
         stop_instance.eta_status = "stale"
         stop_instance.has_constraint_violation = False
         stop_instance.constraint_warnings = None
+        stop_instance.to_next_polyline = None
         stop_instance.stop_order = last_stop_order + index + 1
         payload = {
             "id": stop_instance.id,
@@ -120,7 +125,8 @@ def persist_solution(
             "reason_was_skipped": stop_instance.reason_was_skipped,
             "route_solution_id": route_solution.id,
             "has_constraint_violation": stop_instance.has_constraint_violation,
-            "constraint_warnings":stop_instance.constraint_warnings
+            "constraint_warnings":stop_instance.constraint_warnings,
+            "to_next_polyline": stop_instance.to_next_polyline,
             
         }
         skipped_payloads.append(payload)
@@ -128,11 +134,19 @@ def persist_solution(
 
 
 
+    if request.populate_transition_polylines:
+        _assign_segment_polylines(
+            route_solution=route_solution,
+            routed_stops=routed_stop_instances,
+            transition_polylines=result.transition_polylines or [],
+        )
+
     db.session.add(route_solution)
     db.session.flush()
 
     for payload, stop_instance in payload_refs:
         payload["id"] = stop_instance.id
+        payload["to_next_polyline"] = stop_instance.to_next_polyline
 
     db.session.commit()
 
@@ -176,7 +190,8 @@ def _build_route_solution_payload(route_solution:RouteSolution) -> Dict[str, Any
         "total_travel_time_seconds": route_solution.total_travel_time_seconds,
         "expected_start_time": _serialize_datetime(route_solution.expected_start_time),
         "expected_end_time": _serialize_datetime(route_solution.expected_end_time),
-        "route_polyline": route_solution.route_polyline,
+        "start_leg_polyline": route_solution.start_leg_polyline,
+        "end_leg_polyline": route_solution.end_leg_polyline,
         "start_location": route_solution.start_location,
         "end_location": route_solution.end_location,
         "set_start_time": route_solution.set_start_time,
@@ -207,6 +222,39 @@ def _serialize_datetime(value: datetime | None) -> str | None:
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
     return value.isoformat().replace("+00:00", "Z")
+
+
+def _assign_segment_polylines(
+    route_solution: RouteSolution,
+    routed_stops: list[RouteSolutionStop],
+    transition_polylines: list[Optional[str]],
+) -> None:
+    if not transition_polylines:
+        route_solution.start_leg_polyline = None
+        route_solution.end_leg_polyline = None
+        for stop in routed_stops:
+            stop.to_next_polyline = None
+        return
+
+    ordered_stops = sorted(
+        routed_stops,
+        key=lambda stop: stop.stop_order if stop.stop_order is not None else 0,
+    )
+
+    route_solution.start_leg_polyline = transition_polylines[0] if transition_polylines else None
+    route_solution.end_leg_polyline = (
+        transition_polylines[len(ordered_stops)]
+        if len(transition_polylines) > len(ordered_stops)
+        else None
+    )
+
+    for idx, stop in enumerate(ordered_stops):
+        stop.to_next_polyline = (
+            transition_polylines[idx + 1]
+            if idx + 1 < len(ordered_stops)
+            and len(transition_polylines) > (idx + 1)
+            else None
+        )
 
 
 def calculate_score(result:OptimizationResult):

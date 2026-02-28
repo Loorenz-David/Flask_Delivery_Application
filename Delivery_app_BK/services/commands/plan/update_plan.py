@@ -1,3 +1,55 @@
+from datetime import datetime
+
+from Delivery_app_BK.errors import ValidationFailed
+from Delivery_app_BK.models import DeliveryPlan
+from Delivery_app_BK.services.infra.events.builders.delivery_plan import (
+    build_delivery_plan_rescheduled_event,
+)
+from Delivery_app_BK.services.requests.common.datetime import validate_time_range
+from Delivery_app_BK.services.requests.plan.local_delivery.update_settings import (
+    DeliveryPlanPatchRequest,
+)
+
+
+def apply_delivery_plan_patch(
+    delivery_plan: DeliveryPlan,
+    patch: DeliveryPlanPatchRequest,
+) -> tuple[datetime | None, datetime | None, list[dict]]:
+    previous_start = delivery_plan.start_date
+    previous_end = delivery_plan.end_date
+
+    if patch.has_label:
+        delivery_plan.label = patch.label
+
+    if patch.has_start_date and patch.start_date is not None:
+        delivery_plan.start_date = patch.start_date
+
+    if patch.has_end_date and patch.end_date is not None:
+        delivery_plan.end_date = patch.end_date
+
+    validate_time_range(
+        delivery_plan.start_date, 
+        delivery_plan.end_date,
+        label='delivery plan'
+    )
+
+    pending_events: list[dict] = []
+    if previous_start != delivery_plan.start_date or previous_end != delivery_plan.end_date:
+        pending_events.append(
+            build_delivery_plan_rescheduled_event(
+                delivery_plan_id=delivery_plan.id,
+                old_start_date=previous_start,
+                old_end_date=previous_end,
+                new_start_date=delivery_plan.start_date,
+                new_end_date=delivery_plan.end_date,
+            )
+        )
+
+    return previous_start, previous_end, pending_events
+
+
+
+
 from Delivery_app_BK.errors import ValidationFailed
 from Delivery_app_BK.models import db, DeliveryPlan, Team, Order, DeliveryPlanState
 from ...context import ServiceContext
@@ -91,6 +143,7 @@ def update_plan(ctx: ServiceContext):
     }
     ctx.set_relationship_map(relationship_map)
     instances = []
+    
 
     for target in extract_targets(ctx):
         fields = target["fields"] or {}

@@ -123,16 +123,16 @@ class GoogleResponseMapper:
             travel_distance = int(transition.get("travel_distance_meters", 0))
             total_distance += travel_distance
             total_duration += transition_duration
-            if request.populate_transition_polylines and transition_duration:
-
-
+            if request.populate_transition_polylines:
                 transition_polyline = transition.get("route_polyline")
+                encoded: str | None = None
                 if isinstance(transition_polyline, dict):
                     points = transition_polyline.get("points")
                     if points:
-                        polyline_parts.append(points)
+                        encoded = points
                 elif isinstance(transition_polyline, str):
-                    polyline_parts.append(transition_polyline)
+                    encoded = transition_polyline
+                polyline_parts.append(encoded)
         
         stops: List[StopResult] = []
         for idx, visit in enumerate(visits):
@@ -173,10 +173,10 @@ class GoogleResponseMapper:
             )
         )
 
-        route_polyline = None
+        transition_polylines = None
        
         if request.populate_transition_polylines and polyline_parts:
-            route_polyline = polyline_parts
+            transition_polylines = polyline_parts
         
 
         return OptimizationResult(
@@ -184,7 +184,7 @@ class GoogleResponseMapper:
             total_duration_seconds=total_duration,
             expected_start_time=expected_start,
             expected_end_time=expected_end,
-            route_polyline=route_polyline,
+            transition_polylines=transition_polylines,
             stops=stops,
             skipped=skipped,
         )

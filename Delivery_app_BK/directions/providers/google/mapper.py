@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from Delivery_app_BK.directions.domain.models import (
     DirectionsRequest,
@@ -44,9 +44,9 @@ class GoogleDirectionsRequestMapper:
         field_mask = (
             "routes.duration,"
             "routes.distance_meters,"
-            "routes.polyline.encoded_polyline,"
             "routes.legs.duration,"
-            "routes.legs.distance_meters"
+            "routes.legs.distance_meters,"
+            "routes.legs.polyline.encoded_polyline"
         )
         
         return payload, field_mask
@@ -60,7 +60,7 @@ class GoogleDirectionsResponseMapper:
             return DirectionsResult(
                 total_distance_meters=0,
                 total_duration_seconds=0,
-                polyline=None,
+                leg_polylines=[],
                 start_time=request.departure_time,
                 end_time=request.departure_time,
                 stop_results=[],
@@ -69,11 +69,8 @@ class GoogleDirectionsResponseMapper:
         route = routes[0]
         duration_seconds = _duration_to_seconds(getattr(route, "duration", None))
         distance_meters = int(getattr(route, "distance_meters", 0) or 0)
-        polyline = None
-        if getattr(route, "polyline", None):
-            polyline = getattr(route.polyline, "encoded_polyline", None)
-        
         legs = getattr(route, "legs", None) or []
+        leg_polylines: List[Optional[str]] = []
         stop_results: List[DirectionsStopResult] = []
         departure_time = request.departure_time
         current_time = departure_time
@@ -86,6 +83,13 @@ class GoogleDirectionsResponseMapper:
             else:
                 leg_duration = 0
                 leg_distance = 0
+                leg_polyline = None
+
+            if idx < len(legs):
+                leg_polyline = None
+                if getattr(leg, "polyline", None):
+                    leg_polyline = getattr(leg.polyline, "encoded_polyline", None)
+            leg_polylines.append(leg_polyline)
 
             if current_time:
                 current_time = current_time + timedelta(seconds=leg_duration)
@@ -105,15 +109,29 @@ class GoogleDirectionsResponseMapper:
         end_time = current_time
         if len(legs) > len(request.intermediates) and current_time:
             last_leg = legs[len(request.intermediates)]
+            if getattr(last_leg, "polyline", None):
+                leg_polylines.append(
+                    getattr(last_leg.polyline, "encoded_polyline", None)
+                )
+            else:
+                leg_polylines.append(None)
             current_time = current_time + timedelta(
                 seconds=_duration_to_seconds(getattr(last_leg, "duration", None))
             )
             end_time = current_time
+        elif len(legs) > len(request.intermediates):
+            last_leg = legs[len(request.intermediates)]
+            if getattr(last_leg, "polyline", None):
+                leg_polylines.append(
+                    getattr(last_leg.polyline, "encoded_polyline", None)
+                )
+            else:
+                leg_polylines.append(None)
 
         return DirectionsResult(
             total_distance_meters=distance_meters,
             total_duration_seconds=duration_seconds,
-            polyline=polyline,
+            leg_polylines=leg_polylines,
             start_time=request.departure_time,
             end_time=end_time,
             stop_results=stop_results,

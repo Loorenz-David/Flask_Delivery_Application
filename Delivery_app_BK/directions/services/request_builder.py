@@ -7,7 +7,11 @@ from typing import Any, Dict, List, Optional, Tuple
 from Delivery_app_BK.errors import ValidationFailed
 from Delivery_app_BK.models import Order, RouteSolution, RouteSolutionStop
 
-from Delivery_app_BK.directions.domain.models import DirectionsRequest, DirectionsStopInput
+from Delivery_app_BK.directions.domain.models import (
+    DirectionsRequest,
+    DirectionsRequestBuildResult,
+    DirectionsStopInput,
+)
 from Delivery_app_BK.route_optimization.constants.route_end_strategy import (
     ROUND_TRIP,
     CUSTOM_END_ADDRESS,
@@ -26,29 +30,63 @@ def build_directions_request(
     route_solution: RouteSolution,
     orders_by_id: Dict[int, Order],
     consider_traffic: bool = True,
-    time_zone: str = None
+    time_zone: str = None,
+    recompute_from_position: int = 1,
 ) -> DirectionsRequest:
-    stops:List[RouteSolutionStop] = [stop for stop in (route_solution.stops or []) if stop.order_id]
+    build_result = build_directions_request_bundle(
+        route_solution=route_solution,
+        orders_by_id=orders_by_id,
+        consider_traffic=consider_traffic,
+        time_zone=time_zone,
+        recompute_from_position=recompute_from_position,
+    )
+    return build_result.request
+
+
+def build_directions_request_bundle(
+    route_solution: RouteSolution,
+    orders_by_id: Dict[int, Order],
+    consider_traffic: bool = True,
+    time_zone: str | None = None,
+    recompute_from_position: int = 1,
+) -> DirectionsRequestBuildResult:
+    stops: List[RouteSolutionStop] = [stop for stop in (route_solution.stops or []) if stop.order_id]
     stops.sort(key=lambda stop: stop.stop_order or 0)
     if not stops:
         raise ValidationFailed("Route solution has no stops with orders.")
 
-    origin_location = route_solution.start_location
+    requested_start_position = max(1, int(recompute_from_position or 1))
+    full_recompute = requested_start_position <= 1
+    effective_start_position = 1
+    anchor_stop: RouteSolutionStop | None = None
+    recalculated_stops = stops
 
-    route_end_strategy = route_solution.route_end_strategy
-    if route_end_strategy == ROUND_TRIP:
-        destination_location = origin_location
-    elif route_end_strategy == LAST_STOP:
-        destination_location = _infer_location_from_stops(stops, orders_by_id)
-    else:
-        destination_location = route_solution.end_location
+    if not full_recompute:
+        anchor_stop = _find_stop_by_position(stops, requested_start_position - 1)
+        recalculated_stops = [
+            stop
+            for stop in stops
+            if (stop.stop_order or 0) >= requested_start_position
+        ]
+        if not _can_use_anchor(anchor_stop, orders_by_id):
+            full_recompute = True
+            anchor_stop = None
+            recalculated_stops = stops
+            effective_start_position = 1
+        else:
+            effective_start_position = requested_start_position
 
-    first_order = orders_by_id.get(stops[0].order_id)
-    last_order = orders_by_id.get(stops[-1].order_id)
-
-    origin_location = origin_location or (first_order.client_address if first_order else None)
-    destination_location = destination_location or (
-        last_order.client_address if last_order else origin_location
+    origin_location = _resolve_origin_location(
+        route_solution=route_solution,
+        stops=stops,
+        orders_by_id=orders_by_id,
+        anchor_stop=anchor_stop,
+    )
+    destination_location = _resolve_destination_location(
+        route_solution=route_solution,
+        stops=stops,
+        orders_by_id=orders_by_id,
+        origin_location=origin_location,
     )
 
     origin_coordinates = _coordinates_from_location(origin_location)
@@ -56,8 +94,104 @@ def build_directions_request(
     if not origin_coordinates or not destination_coordinates:
         raise ValidationFailed("Origin or destination is missing coordinates.")
 
-    intermediates = []
+    intermediates = _build_intermediates(recalculated_stops, orders_by_id)
+    if full_recompute and not intermediates:
+        raise ValidationFailed("Route solution has no stops with valid coordinates.")
+
+    departure_time = _resolve_recompute_departure_time(
+        route_solution=route_solution,
+        orders_by_id=orders_by_id,
+        time_zone=time_zone,
+        anchor_stop=anchor_stop,
+    )
+
+    request = DirectionsRequest(
+        origin=origin_coordinates,
+        destination=destination_coordinates,
+        intermediates=intermediates,
+        travel_mode=DEFAULT_TRAVEL_MODE,
+        consider_traffic=consider_traffic,
+        route_modifiers=dict(DEFAULT_ROUTE_MODIFIERS),
+        departure_time=departure_time,
+    )
+
+    return DirectionsRequestBuildResult(
+        request=request,
+        full_recompute=full_recompute,
+        effective_start_position=effective_start_position,
+        anchor_order_id=anchor_stop.order_id if anchor_stop else None,
+        affected_order_ids=[stop.order_id for stop in recalculated_stops if stop.order_id],
+    )
+
+
+def _find_stop_by_position(
+    stops: list[RouteSolutionStop],
+    position: int,
+) -> RouteSolutionStop | None:
     for stop in stops:
+        if (stop.stop_order or 0) == position:
+            return stop
+    return None
+
+
+def _can_use_anchor(
+    anchor_stop: RouteSolutionStop | None,
+    orders_by_id: Dict[int, Order],
+) -> bool:
+    if not anchor_stop or not anchor_stop.order_id:
+        return False
+    if anchor_stop.expected_arrival_time is None:
+        return False
+    anchor_order = orders_by_id.get(anchor_stop.order_id)
+    if not anchor_order:
+        return False
+    return _coordinates_from_location(anchor_order.client_address) is not None
+
+
+def _resolve_origin_location(
+    route_solution: RouteSolution,
+    stops: list[RouteSolutionStop],
+    orders_by_id: Dict[int, Order],
+    anchor_stop: RouteSolutionStop | None,
+) -> Dict[str, Any] | None:
+    if anchor_stop and anchor_stop.order_id:
+        anchor_order = orders_by_id.get(anchor_stop.order_id)
+        if anchor_order and anchor_order.client_address:
+            return anchor_order.client_address
+
+    origin_location = route_solution.start_location
+    first_order = orders_by_id.get(stops[0].order_id) if stops else None
+    return origin_location or (first_order.client_address if first_order else None)
+
+
+def _resolve_destination_location(
+    route_solution: RouteSolution,
+    stops: list[RouteSolutionStop],
+    orders_by_id: Dict[int, Order],
+    origin_location: Dict[str, Any] | None,
+) -> Dict[str, Any] | None:
+    route_end_strategy = route_solution.route_end_strategy
+    if route_end_strategy == ROUND_TRIP:
+        destination_location = route_solution.start_location or origin_location
+    elif route_end_strategy == LAST_STOP:
+        destination_location = _infer_location_from_stops(stops, orders_by_id)
+    else:
+        destination_location = route_solution.end_location
+
+    last_order = orders_by_id.get(stops[-1].order_id) if stops else None
+    return destination_location or (
+        last_order.client_address if last_order else origin_location
+    )
+
+
+def _build_intermediates(
+    stops: list[RouteSolutionStop],
+    orders_by_id: Dict[int, Order],
+) -> list[DirectionsStopInput]:
+    intermediates: list[DirectionsStopInput] = []
+    for stop in stops:
+        if not stop.order_id:
+            continue
         order = orders_by_id.get(stop.order_id)
         if not order:
             continue
@@ -72,20 +206,21 @@ def build_directions_request(
                 service_duration_seconds=service_duration_seconds,
             )
         )
+    return intermediates
 
-    departure_time = _resolve_departure_time(route_solution, orders_by_id, time_zone = time_zone)
 
-    print(departure_time)
-
-    return DirectionsRequest(
-        origin=origin_coordinates,
-        destination=destination_coordinates,
-        intermediates=intermediates,
-        travel_mode=DEFAULT_TRAVEL_MODE,
-        consider_traffic=consider_traffic,
-        route_modifiers=dict(DEFAULT_ROUTE_MODIFIERS),
-        departure_time=departure_time,
-    )
+def _resolve_recompute_departure_time(
+    route_solution: RouteSolution,
+    orders_by_id: Dict[int, Order],
+    time_zone: str | None,
+    anchor_stop: RouteSolutionStop | None,
+) -> Optional[datetime]:
+    if anchor_stop and anchor_stop.expected_arrival_time:
+        departure_time = _coerce_datetime(anchor_stop.expected_arrival_time)
+        if departure_time is not None:
+            service_seconds = _parse_duration_seconds(anchor_stop.service_duration) or 0
+            return departure_time + timedelta(seconds=service_seconds)
+    return _resolve_departure_time(route_solution, orders_by_id, time_zone=time_zone)
 
 
 def build_time_windows(

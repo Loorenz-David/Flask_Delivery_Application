@@ -10,16 +10,12 @@ from Delivery_app_BK.routers.utils.role_decorator import (
 from Delivery_app_BK.routers.http.response import Response
 from Delivery_app_BK.services.context import ServiceContext
 from Delivery_app_BK.services.run_service import run_service
-from Delivery_app_BK.services.commands.route_solution.stops.update_route_stop_position import (
+from Delivery_app_BK.services.commands.plan.local_delivery.route_solution.stops.update_route_stop_position import (
     update_route_stop_position as update_route_stop_position_service,
 )
-from Delivery_app_BK.services.commands.route_solution import (
-    update_route_solution_address as update_route_solution_address_service,
-)
-from Delivery_app_BK.services.commands.route_solution.update_route_solution_times import (
-    update_route_solution_times as update_route_solution_times_service,
-)
-from Delivery_app_BK.services.commands.route_solution.select_route_solution import (
+
+
+from Delivery_app_BK.services.commands.plan.local_delivery.route_solution.select_route_solution import (
     select_route_solution as select_route_solution_service,
 )
 from Delivery_app_BK.services.queries.route_solutions.get_route_solution import (
@@ -43,7 +39,6 @@ def update_route_stop_position(
     route_stop_id: int,
     position: int,
 ):
-    time_zone = request.args.get("time_zone")
     identity = get_jwt()
     ctx = ServiceContext(identity=identity)
     
@@ -52,7 +47,6 @@ def update_route_stop_position(
             c,
             route_stop_id,
             position,
-            time_zone = time_zone
         ),
         ctx,
     )
@@ -67,54 +61,9 @@ def update_route_stop_position(
     )
 
 
-@route_solution_bp.route("/address", methods=["PATCH"])
-@jwt_required()
-@role_required([ADMIN, ASSISTANT, DRIVER])
-def update_route_solution_address():
-    identity = get_jwt()
-    incoming_data = request.get_json(silent=True) or {}
-    ctx = ServiceContext(
-        incoming_data=incoming_data,
-        identity=identity,
-    )
-    outcome = run_service(
-        lambda c: update_route_solution_address_service(c),
-        ctx,
-    )
-    response = Response()
-
-    if outcome.error:
-        return response.build_unsuccessful_response(outcome.error)
-
-    return response.build_successful_response(
-        outcome.data or {},
-        warnings=ctx.warnings,
-    )
 
 
-@route_solution_bp.route("/times", methods=["PATCH"])
-@jwt_required()
-@role_required([ADMIN, ASSISTANT, DRIVER])
-def update_route_solution_times():
-    identity = get_jwt()
-    incoming_data = request.get_json(silent=True) or {}
-    ctx = ServiceContext(
-        incoming_data=incoming_data,
-        identity=identity,
-    )
-    outcome = run_service(
-        lambda c: update_route_solution_times_service(c),
-        ctx,
-    )
-    response = Response()
 
-    if outcome.error:
-        return response.build_unsuccessful_response(outcome.error)
-
-    return response.build_successful_response(
-        outcome.data or {},
-        warnings=ctx.warnings,
-    )
 
 
 @route_solution_bp.route("/<int:route_solution_id>/select", methods=["PATCH"])
@@ -202,5 +151,3 @@ def update_route_optimization():
         outcome.data or {},
         warnings=ctx.warnings,
     )
-
-

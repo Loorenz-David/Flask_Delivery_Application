@@ -95,7 +95,8 @@ class RouteSolution(db.Model, TeamScopedMixin, AddressJSONValidationMixin):
         index=True
     )
 
-    route_polyline = Column(JSONB)
+    start_leg_polyline = Column(JSONB, nullable=True)
+    end_leg_polyline = Column(JSONB, nullable=True)
     stops = relationship(
         "RouteSolutionStop",
         back_populates = "route_solution",

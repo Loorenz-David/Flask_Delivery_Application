@@ -50,6 +50,7 @@ class RouteSolutionStop(db.Model, TeamScopedMixin):
     
     expected_arrival_time = Column(UTCDateTime)
     actual_arrival_time = Column(UTCDateTime)
+    to_next_polyline = Column(JSONB, nullable=True)
 
     route_solution = relationship(
         "RouteSolution",

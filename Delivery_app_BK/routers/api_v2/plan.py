@@ -32,7 +32,7 @@ from Delivery_app_BK.services.commands.plan.delete_plan import (
 from Delivery_app_BK.services.commands.plan.mark_plan_state import (
     mark_plan_state as mark_plan_state_service
 )
-from Delivery_app_BK.services.commands.plan_states.update_plan_state import (
+from Delivery_app_BK.services.commands.plan.plan_states.update_plan_state import (
     update_plan_state as update_plan_state_service,
 )
 from Delivery_app_BK.services.queries.order.list_orders import (

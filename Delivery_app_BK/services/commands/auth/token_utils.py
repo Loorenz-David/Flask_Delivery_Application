@@ -4,17 +4,26 @@ from flask_jwt_extended import create_access_token, create_refresh_token
 from Delivery_app_BK.models import User, UserRole, BaseRole
 
 
-def build_user_tokens(user: User) -> dict:
+def _build_auth_claims(user: User, *, time_zone: str | None) -> dict:
     user_role: UserRole = user.user_role
     base_role: BaseRole = user_role.base_role
+    effective_time_zone = time_zone or "UTC"
 
-    identity_data = str(user.id)
-    claims = {
+    return {
         "user_id": user.id,
         "team_id": user.team_id,
         "user_role_id": user_role.id,
         "base_role_id": base_role.id,
+        "time_zone": effective_time_zone,
     }
+
+
+def build_user_tokens(user: User, *, time_zone: str | None = None) -> dict:
+    user_role: UserRole = user.user_role
+    base_role: BaseRole = user_role.base_role
+
+    identity_data = str(user.id)
+    claims = _build_auth_claims(user, time_zone=time_zone)
 
     access_token = create_access_token(identity=identity_data, additional_claims=claims)
     refresh_token = create_refresh_token(identity=identity_data, additional_claims=claims)

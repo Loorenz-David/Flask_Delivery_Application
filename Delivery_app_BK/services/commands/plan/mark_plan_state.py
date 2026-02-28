@@ -1,6 +1,6 @@
 from Delivery_app_BK.models.tables.delivery_plan.delivery_plan import DeliveryPlan, db
 from ...context import ServiceContext
-from Delivery_app_BK.services.commands.order_states.update_orders_state import update_orders_state
+from Delivery_app_BK.services.commands.order.order_states.update_orders_state import update_orders_state
 from Delivery_app_BK.services.domain.plan.plan_states import PlanStateId
 from ...domain.order.order_states import OrderStateId
 from Delivery_app_BK.services.queries.get_instance import get_instance

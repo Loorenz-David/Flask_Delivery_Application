@@ -30,4 +30,4 @@ def leave_team(ctx: ServiceContext):
 
     db.session.commit()
 
-    return build_user_tokens(user)
+    return build_user_tokens(user, time_zone=ctx.identity.get("time_zone"))

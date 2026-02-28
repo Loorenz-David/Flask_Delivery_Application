@@ -1,5 +1,5 @@
 
-ORDER_CREATED_AFTER_OPTIMIZATION = "This order was created after the route was optimized, so no arrival time is available.",
+ORDER_CREATED_AFTER_OPTIMIZATION = "This order was created after the route was optimized.",
 
 ORDER_CHANGE_DELIVERY_PLAN_AFTER_OPTIMIZATION = "This order was moved to a new delivery plan after the route was optimized, so no arrival time is available.",
 

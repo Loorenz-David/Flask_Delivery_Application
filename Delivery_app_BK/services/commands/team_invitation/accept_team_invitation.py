@@ -35,4 +35,4 @@ def accept_team_invitation(ctx: ServiceContext, invitation_id: int):
     db.session.commit()
     db.session.refresh(user)
 
-    return build_user_tokens(user)
+    return build_user_tokens(user, time_zone=ctx.identity.get("time_zone"))

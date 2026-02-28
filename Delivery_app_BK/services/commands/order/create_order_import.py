@@ -71,7 +71,6 @@ def _item_import_mapper(row):
         "client_id": generate_client_id('order'),
         "article_number": _clean_value(row.get("article_number")),
         "reference_number": _clean_value(row.get("item_reference_number")),
-        "delivery_plan_id":_parse_int(row.get("delivery_plan_id")) or None,
         "item_type": _clean_value(row.get("item_type")),
         "page_link": _clean_value(row.get("page_link")),
         "quantity": _parse_int(row.get("quantity"), default=1),
@@ -212,8 +211,6 @@ def create_order_import( ctx:ServiceContext  ):
             ctx.set_warning(f"Row {index}: {str(e)}")
 
     ctx.incoming_data = orders
-    from pprint import pprint
-    pprint(orders)
     result = create_order(ctx)
 
     return result
