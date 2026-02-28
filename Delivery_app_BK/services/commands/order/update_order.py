@@ -1,17 +1,33 @@
+from __future__ import annotations
+
 from datetime import datetime
 from typing import Any
+
+from sqlalchemy.exc import InvalidRequestError
+from sqlalchemy.orm import joinedload
 from sqlalchemy.orm.exc import NoResultFound
 
 from Delivery_app_BK.errors import ValidationFailed
 from Delivery_app_BK.models import (
-    db,
+    DeliveryPlan,
     Order,
+    db,
+)
+from Delivery_app_BK.services.commands.order.create_serializers import (
+    serialize_created_order,
+)
+from Delivery_app_BK.services.commands.order.update_extensions import (
+    OrderUpdateChangeFlags,
+    OrderUpdateDelta,
+    apply_order_update_extensions,
+    build_order_update_extension_context,
 )
 from Delivery_app_BK.services.infra.events.builders.order import (
     build_delivery_window_rescheduled_by_user_event,
 )
 from Delivery_app_BK.services.infra.events.emiters.order import emit_order_events
 from Delivery_app_BK.services.utils import model_requires_team, require_team_id, to_datetime
+
 from ...context import ServiceContext
 from ..utils import extract_targets
 from ..utils.inject_fields import inject_fields
@@ -49,39 +65,94 @@ MUTABLE_FIELDS = {
     "preferred_time_end",
 }
 
+ADDRESS_FIELDS = {"client_address"}
+WINDOW_FIELDS = {
+    "earliest_delivery_date",
+    "latest_delivery_date",
+    "preferred_time_start",
+    "preferred_time_end",
+}
+
 
 def update_order(ctx: ServiceContext):
     ctx.set_relationship_map({})
     targets = extract_targets(ctx)
     _validate_targets_update_fields(targets)
-    instances, pending_events = apply_order_updates(ctx, targets)
-    db.session.commit()
-    emit_order_events(ctx, pending_events)
-    return instances
+
+    updated_orders: list[Order] = []
+    pending_events: list[dict[str, Any]] = []
+    order_deltas: list[OrderUpdateDelta] = []
+    extension_result = None
+
+    def _apply() -> None:
+        nonlocal updated_orders, pending_events, order_deltas, extension_result
+        updated_orders, pending_events, order_deltas = apply_order_updates(ctx, targets)
+        extension_context = build_order_update_extension_context(ctx, order_deltas)
+        extension_result = apply_order_update_extensions(ctx, order_deltas, extension_context)
+
+        db.session.flush()
+        for action in extension_result.post_flush_actions:
+            action()
+
+        if extension_result.instances:
+            db.session.add_all(extension_result.instances)
+
+    try:
+        with db.session.begin():
+            _apply()
+    except InvalidRequestError as exc:
+        if "already begun" not in str(exc).lower():
+            raise
+        _apply()
+        db.session.commit()
+
+    if pending_events:
+        emit_order_events(ctx, pending_events)
+
+    bundles: list[dict[str, Any]] = []
+    bundle_by_order_id = (extension_result.bundle_by_order_id if extension_result else {}) or {}
+    
+
+    for order_instance in updated_orders:
+        order_id = getattr(order_instance, "id", None)
+        extension_bundle = {}
+        if order_id is not None:
+            extension_bundle = (
+                bundle_by_order_id.get(order_id)
+                or bundle_by_order_id.get(str(order_id))
+                or {}
+            )
+        bundle = {"order": serialize_created_order(order_instance)}
+        
+
+        bundle.update(extension_bundle)
+        bundles.append(bundle)
+
+    return {"updated": bundles}
 
 
 def apply_order_updates(
     ctx: ServiceContext,
     targets: list[dict[str, Any]],
-) -> tuple[list[int], list[dict[str, Any]]]:
-    
-    updated_order_ids: list[int] = []
+) -> tuple[list[Order], list[dict[str, Any]], list[OrderUpdateDelta]]:
+    updated_orders: list[Order] = []
     pending_events: list[dict[str, Any]] = []
+    order_deltas: list[OrderUpdateDelta] = []
     existing_orders = _resolve_orders_by_targets(ctx, targets)
 
     for order_target in targets:
         target_id = order_target["target_id"]
         existing: Order = existing_orders[target_id]
+        fields_to_apply = _build_mutable_fields(order_target["fields"])
 
+        old_values = _capture_sync_values(existing)
         old_earliest: datetime = to_datetime(existing.earliest_delivery_date)
         old_latest: datetime = to_datetime(existing.latest_delivery_date)
 
-        fields_to_apply = _build_mutable_fields(order_target["fields"])
         if fields_to_apply:
             inject_fields(ctx, existing, fields_to_apply)
 
-        updated_order_ids.append(existing.id)
-
+        new_values = _capture_sync_values(existing)
         new_earliest = to_datetime(existing.earliest_delivery_date)
         new_latest = to_datetime(existing.latest_delivery_date)
 
@@ -96,7 +167,60 @@ def apply_order_updates(
                 )
             )
 
-    return updated_order_ids, pending_events
+        flags = _build_change_flags(old_values, new_values, fields_to_apply)
+        order_deltas.append(
+            OrderUpdateDelta(
+                order_instance=existing,
+                old_values=old_values,
+                new_values=new_values,
+                flags=flags,
+                delivery_plan=_resolve_delivery_plan_for_order(existing),
+            )
+        )
+        updated_orders.append(existing)
+
+    return updated_orders, pending_events, order_deltas
+
+
+def _build_change_flags(
+    old_values: dict[str, Any],
+    new_values: dict[str, Any],
+    applied_fields: dict[str, Any],
+) -> OrderUpdateChangeFlags:
+    touched_address = ADDRESS_FIELDS.intersection(applied_fields.keys())
+    touched_window = WINDOW_FIELDS.intersection(applied_fields.keys())
+
+    # Intent-driven flags: if these fields are submitted, run their extension flows.
+    # This keeps route sync / warning recompute deterministic with PATCH payload intent.
+    address_changed = bool(touched_address)
+    window_changed = bool(touched_window)
+
+    return OrderUpdateChangeFlags(
+        address_changed=address_changed,
+        window_changed=window_changed,
+    )
+
+
+def _capture_sync_values(order: Order) -> dict[str, Any]:
+    return {
+        "client_address": order.client_address,
+        "earliest_delivery_date": order.earliest_delivery_date,
+        "latest_delivery_date": order.latest_delivery_date,
+        "preferred_time_start": order.preferred_time_start,
+        "preferred_time_end": order.preferred_time_end,
+    }
+
+
+def _resolve_delivery_plan_for_order(order: Order) -> DeliveryPlan | None:
+    existing_delivery_plan = getattr(order, "delivery_plan", None)
+    if existing_delivery_plan is not None:
+        return existing_delivery_plan
+
+    delivery_plan_id = getattr(order, "delivery_plan_id", None)
+    if not delivery_plan_id:
+        return None
+
+    return db.session.get(DeliveryPlan, delivery_plan_id)
 
 
 def _validate_targets_update_fields(targets: list[dict[str, Any]]) -> None:
@@ -140,14 +264,22 @@ def _resolve_orders_by_targets(
         team_id = require_team_id(ctx)
 
     if int_ids:
-        query = db.session.query(Order).filter(Order.id.in_(int_ids))
+        query = (
+            db.session.query(Order)
+            .options(joinedload(Order.delivery_plan))
+            .filter(Order.id.in_(int_ids))
+        )
         if team_id is not None:
             query = query.filter(Order.team_id == team_id)
         for order in query.all():
             orders_by_id[order.id] = order
 
     if client_ids:
-        query = db.session.query(Order).filter(Order.client_id.in_(client_ids))
+        query = (
+            db.session.query(Order)
+            .options(joinedload(Order.delivery_plan))
+            .filter(Order.client_id.in_(client_ids))
+        )
         if team_id is not None:
             query = query.filter(Order.team_id == team_id)
         for order in query.all():
@@ -156,7 +288,11 @@ def _resolve_orders_by_targets(
     resolved: dict[int | str, Order] = {}
     missing: list[int | str] = []
     for target_id in target_ids:
-        order = orders_by_id.get(target_id) if isinstance(target_id, int) else orders_by_client_id.get(target_id)
+        order = (
+            orders_by_id.get(target_id)
+            if isinstance(target_id, int)
+            else orders_by_client_id.get(target_id)
+        )
         if order is None:
             missing.append(target_id)
             continue

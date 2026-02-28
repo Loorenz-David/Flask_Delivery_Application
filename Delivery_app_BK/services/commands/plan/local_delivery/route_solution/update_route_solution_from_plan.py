@@ -12,6 +12,11 @@ from Delivery_app_BK.route_optimization.constants.is_optimized import (
 
 from .clone import clone_route_solution
 from .plan_sync.changes import apply_route_solution_field_updates
+from .plan_sync.expectations import (
+    apply_expected_end_shift_from_window,
+    apply_expected_start_from_window,
+    sync_route_end_warning,
+)
 from .plan_sync.stop_window_updates import apply_time_window_update
 from .plan_sync.window import resolve_window, validate_window
 
@@ -45,7 +50,6 @@ def update_route_solution_from_plan(
         route_solution=route_solution,
         updates=updates,
     )
-
     old_window = resolve_window(
         previous_plan_start or plan_start,
         previous_plan_end or plan_end,
@@ -58,7 +62,7 @@ def update_route_solution_from_plan(
         route_solution.set_start_time,
         route_solution.set_end_time,
     )
-
+   
     validate_window(new_window)
 
     window_changed = old_window != new_window
@@ -77,6 +81,9 @@ def update_route_solution_from_plan(
     if has_time_change and route_solution.is_optimized != IS_OPTIMIZED_NOT_OPTIMIZED:
         route_solution.is_optimized = IS_OPTIMIZED_PARTIAL
 
+    if new_window and (window_changed or has_time_change):
+        apply_expected_start_from_window(route_solution, new_window)
+
     if window_changed and new_window and old_window:
         shift_times = not has_address_change
         window_changes, has_violation = apply_time_window_update(
@@ -86,8 +93,29 @@ def update_route_solution_from_plan(
             shift_times=shift_times,
         )
         stops_changed = stops_changed or window_changes
+        apply_expected_end_shift_from_window(
+            route_solution,
+            old_window,
+            new_window,
+            shift_times,
+        )
         if has_violation:
             route_solution.is_optimized = IS_OPTIMIZED_PARTIAL
+    elif has_time_change and new_window:
+        # Time text can change without changing parsed window boundaries.
+        # Rebuild route-window warnings to keep stop-level violations current.
+        warning_changes, has_violation = apply_time_window_update(
+            route_solution,
+            new_window,
+            new_window,
+            shift_times=False,
+        )
+        stops_changed = stops_changed or warning_changes
+        if has_violation and route_solution.is_optimized != IS_OPTIMIZED_NOT_OPTIMIZED:
+            route_solution.is_optimized = IS_OPTIMIZED_PARTIAL
+
+    allowed_end = new_window[1] if new_window else None
+    sync_route_end_warning(route_solution, allowed_end)
 
     return route_solution, stops_changed, original_route_solution
 

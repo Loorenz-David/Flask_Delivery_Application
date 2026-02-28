@@ -100,6 +100,7 @@ def create_order():
     identity = get_jwt()
     incoming_data = request.get_json(silent=True) or {}
     prevent_event_bus = incoming_data.pop("prevent_event_bus", False)
+    
     ctx = ServiceContext(
         incoming_data=incoming_data,
         identity=identity,
@@ -109,9 +110,11 @@ def create_order():
     outcome = run_service(lambda c: create_order_service(c), ctx)
     response = Response()
 
+    
+
     if outcome.error:
         return response.build_unsuccessful_response(outcome.error)
-
+    
     return response.build_successful_response(
         outcome.data,
         warnings=ctx.warnings,
@@ -132,12 +135,12 @@ def update_order():
     )
     outcome = run_service(lambda c: update_order_service(c), ctx)
     response = Response()
-
+    
     if outcome.error:
         return response.build_unsuccessful_response(outcome.error)
 
     return response.build_successful_response(
-        {},
+        outcome.data or {},
         warnings=ctx.warnings,
     )
 
@@ -152,14 +155,15 @@ def delete_order():
         incoming_data=incoming_data,
         identity=identity,
     )
+    
     outcome = run_service(lambda c: delete_order_service(c), ctx)
     response = Response()
-
+  
     if outcome.error:
         return response.build_unsuccessful_response(outcome.error)
-
+   
     return response.build_successful_response(
-        {},
+        outcome.data or {},
         warnings=ctx.warnings,
     )
 

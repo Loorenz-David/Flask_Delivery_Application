@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, time as time_cls, timezone
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from Delivery_app_BK.models import Order, RouteSolution, RouteSolutionStop
 from Delivery_app_BK.models.mixins.validation_mixins.time_warning_validation import (
@@ -14,14 +14,15 @@ from Delivery_app_BK.directions.domain.models import (
 )
 from Delivery_app_BK.directions.services.request_builder import (
     _parse_time_string,
-    build_time_windows,
+)
+from Delivery_app_BK.directions.services.warnings import (
+    build_stop_time_warnings,
+    ensure_utc,
 )
 
 
 def _ensure_utc(value: Optional[datetime]) -> Optional[datetime]:
-    if not value:
-        return None
-    return value.astimezone(timezone.utc) if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    return ensure_utc(value)
 
 
 def apply_directions_result(
@@ -30,6 +31,7 @@ def apply_directions_result(
     orders_by_id: Dict[int, Order],
     build_result: DirectionsRequestBuildResult,
 ) -> list[RouteSolutionStop]:
+   
     if build_result.full_recompute:
         route_solution.total_distance_meters = directions_result.total_distance_meters
         route_solution.total_travel_time_seconds = directions_result.total_duration_seconds
@@ -78,8 +80,9 @@ def apply_directions_result(
         stop.in_range = True
         stop.reason_was_skipped = None
 
-        warnings = _build_stop_warnings(
-            orders_by_id.get(stop.order_id),
+        order_instance = orders_by_id.get(stop.order_id) or getattr(stop, "order", None)
+        warnings = build_stop_time_warnings(
+            order_instance,
             stop.expected_arrival_time,
             route_solution,
         )
@@ -184,45 +187,6 @@ def _dedupe_stops(stops: list[RouteSolutionStop]) -> list[RouteSolutionStop]:
             seen.add(stop_id)
         deduped.append(stop)
     return deduped
-
-
-def _build_stop_warnings(
-    order: Optional[Order],
-    arrival_time: Optional[datetime],
-    route_solution: RouteSolution,
-) -> List[dict]:
-    if not order or not arrival_time:
-        return []
-
-    base_date = None
-    base_end_date = None
-    if route_solution.local_delivery_plan and route_solution.local_delivery_plan.delivery_plan:
-        plan = route_solution.local_delivery_plan.delivery_plan
-        base_date = plan.start_date
-        base_end_date = plan.end_date
-
-    arrival_time = _ensure_utc(arrival_time)
-    windows = build_time_windows(order, base_date, base_end_date)
-
-    if not windows:
-        return []
-
-    for window_start, window_end in windows:
-        window_start = _ensure_utc(window_start)
-        window_end = _ensure_utc(window_end)
-        if window_start and window_end and arrival_time and window_start <= arrival_time <= window_end:
-            return []
-
-    window_start, window_end = windows[0]
-    window_start = _ensure_utc(window_start)
-    window_end = _ensure_utc(window_end)
-    return [
-        TimeWarningFactory.time_window_violation(
-            expected_time=arrival_time,
-            window_start=window_start,
-            window_end=window_end,
-        )
-    ]
 
 
 def _resolve_allowed_end(route_solution: RouteSolution) -> Optional[datetime]:

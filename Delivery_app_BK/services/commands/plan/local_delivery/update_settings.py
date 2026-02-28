@@ -25,35 +25,18 @@ def update_local_delivery_settings(ctx: ServiceContext) -> dict:
     request: LocalDeliverySettingsRequest = parse_update_local_delivery_settings_request(
         incoming_data
     )
-    logger.info(
-        "Local delivery settings request parsed | local_delivery_plan_id=%s | route_solution_id=%s | create_variant_on_save=%s",
-        request.local_delivery_plan_id,
-        request.route_solution.route_solution_id,
-        request.create_variant_on_save,
-    )
-
+ 
     local_delivery_plan, delivery_plan, route_solution = load_local_delivery_settings_entities(
         ctx=ctx,
         request=request,
     )
-    logger.debug(
-        "Local delivery entities loaded | delivery_plan_id=%s | local_delivery_plan_id=%s | route_solution_id=%s",
-        delivery_plan.id,
-        local_delivery_plan.id,
-        route_solution.id,
-    )
+   
 
     previous_start, previous_end, pending_plan_events = apply_delivery_plan_patch(
         delivery_plan=delivery_plan,
         patch=request.delivery_plan,
     )
-    logger.debug(
-        "Delivery plan patch applied | delivery_plan_id=%s | start_changed=%s | end_changed=%s",
-        delivery_plan.id,
-        previous_start != delivery_plan.start_date,
-        previous_end != delivery_plan.end_date,
-    )
-
+  
    
 
     route_updates = _build_route_solution_updates(request.route_solution)
@@ -68,11 +51,16 @@ def update_local_delivery_settings(ctx: ServiceContext) -> dict:
         create_variant_on_save=request.create_variant_on_save,
         time_zone=effective_time_zone,
     )
-    logger.info(
-        "Route solution updated from plan settings | route_solution_id=%s | cloned=%s | stops_changed=%s",
-        route_solution.id,
-        original_route_solution is not None,
-        stops_changed,
+    plan_window_changed = (
+        previous_start != delivery_plan.start_date
+        or previous_end != delivery_plan.end_date
+    )
+    route_patch_requested = _has_route_solution_patch(request.route_solution)
+    route_solution_changed = (
+        plan_window_changed
+        or route_patch_requested
+        or original_route_solution is not None
+        or stops_changed
     )
 
     db.session.add(delivery_plan)
@@ -84,23 +72,16 @@ def update_local_delivery_settings(ctx: ServiceContext) -> dict:
         db.session.add_all(route_solution.stops or [])
     db.session.commit()
 
-    logger.info(
-        "Local delivery settings committed | delivery_plan_id=%s | local_delivery_plan_id=%s | route_solution_id=%s",
-        delivery_plan.id,
-        local_delivery_plan.id,
-        route_solution.id,
-    )
+   
 
     emit_pending_delivery_plan_events(ctx, pending_plan_events)
-    logger.info(
-        "Local delivery pending events emitted | count=%s",
-        len(pending_plan_events),
-    )
+   
 
     return build_local_delivery_settings_response(
         ctx=ctx,
         route_solution=route_solution,
         stops_changed=stops_changed,
+        route_solution_changed=route_solution_changed,
     )
 
 
@@ -134,3 +115,16 @@ def _warn_if_driver_conflict(ctx: ServiceContext, raw: dict) -> None:
         ctx.set_warning(
             "route_solution.driver_id overrides local_delivery_plan.driver_id in this update."
         )
+
+
+def _has_route_solution_patch(route_patch: RouteSolutionPatchRequest) -> bool:
+    return any(
+        [
+            route_patch.has_start_location,
+            route_patch.has_end_location,
+            route_patch.has_set_start_time,
+            route_patch.has_set_end_time,
+            route_patch.has_route_end_strategy,
+            route_patch.has_driver_id,
+        ]
+    )

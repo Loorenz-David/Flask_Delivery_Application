@@ -10,14 +10,18 @@ def build_local_delivery_settings_response(
     ctx: ServiceContext,
     route_solution: RouteSolution,
     stops_changed: bool,
+    route_solution_changed: bool,
 ) -> dict:
-    if not stops_changed:
+    if not route_solution_changed and not stops_changed:
         return {}
 
-    return {
+    response = {
         "route_solution": serialize_route_solutions([route_solution], ctx),
-        "route_solution_stops": serialize_route_solution_stops(
+    }
+    if stops_changed:
+        response["route_solution_stops"] = serialize_route_solution_stops(
             list(route_solution.stops or []),
             ctx,
-        ),
-    }
+        )
+
+    return response

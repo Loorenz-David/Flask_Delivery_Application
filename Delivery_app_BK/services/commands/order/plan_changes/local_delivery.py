@@ -3,21 +3,22 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from Delivery_app_BK.errors import ValidationFailed
-from Delivery_app_BK.models import DeliveryPlan, RouteSolutionStop
-from Delivery_app_BK.directions import refresh_route_solution_incremental
-from Delivery_app_BK.route_optimization.constants.is_optimized import (
-    IS_OPTIMIZED_OPTIMIZE,
-    IS_OPTIMIZED_PARTIAL,
-)
+from Delivery_app_BK.models import DeliveryPlan, RouteSolution, RouteSolutionStop
 from Delivery_app_BK.route_optimization.constants.skip_reasons import (
     ORDER_CHANGE_DELIVERY_PLAN_AFTER_OPTIMIZATION,
 )
 from Delivery_app_BK.services.commands.order.create_serializers import (
     serialize_created_order_stops,
 )
+from Delivery_app_BK.services.queries.route_solutions.serialize_route_solutions import (
+    serialize_route_solution,
+)
 from Delivery_app_BK.services.commands.plan.local_delivery.route_solution.stops import (
     build_route_solution_stops,
     remove_order_stops_for_local_delivery,
+)
+from Delivery_app_BK.services.commands.plan.local_delivery.route_solution.plan_sync import (
+    build_incremental_route_sync_action,
 )
 
 from ....context import ServiceContext
@@ -34,6 +35,8 @@ def apply_local_delivery_plan_change(
     instances: list[object] = []
     post_flush_actions: list[Callable[[], None]] = []
     created_stops: list[RouteSolutionStop] = []
+    synced_stops: list[RouteSolutionStop] = []
+    changed_route_solutions: list[RouteSolution] = []
     starts_by_route_id: dict[int, int] = {}
 
     if old_plan and getattr(old_plan, "plan_type", None) == "local_delivery":
@@ -94,24 +97,38 @@ def apply_local_delivery_plan_change(
 
     if starts_by_route_id:
         post_flush_actions.append(
-            _build_incremental_route_sync_action(
+            build_incremental_route_sync_action(
                 ctx=ctx,
-                apply_context=apply_context,
                 starts_by_route_id=starts_by_route_id,
+                route_solutions_by_id=_build_route_solutions_by_id(apply_context),
+                synced_stops=synced_stops,
+                changed_route_solutions=changed_route_solutions,
             )
         )
 
     return PlanChangeResult(
         instances=instances,
         post_flush_actions=post_flush_actions,
-        bundle_serializer=lambda stops=created_stops: _serialize_stop_bundle(stops),
+        bundle_serializer=lambda created=created_stops, synced=synced_stops, changed_routes=changed_route_solutions: _serialize_bundle(
+            _merge_changed_stops(created, synced),
+            _merge_changed_route_solutions(changed_routes),
+        ),
     )
 
 
-def _serialize_stop_bundle(stops: list[RouteSolutionStop]) -> dict:
-    if not stops:
-        return {}
-    return {"order_stops": serialize_created_order_stops(stops)}
+def _serialize_bundle(
+    stops: list[RouteSolutionStop],
+    route_solutions: list[RouteSolution],
+) -> dict:
+    bundle: dict = {}
+    if stops:
+        bundle["order_stops"] = serialize_created_order_stops(stops)
+    if route_solutions:
+        bundle["route_solution"] = [
+            serialize_route_solution(route_solution)
+            for route_solution in route_solutions
+        ]
+    return bundle
 
 
 def _build_stop_order_link_action(
@@ -124,65 +141,57 @@ def _build_stop_order_link_action(
     return _link
 
 
-def _build_incremental_route_sync_action(
-    ctx: ServiceContext,
+def _build_route_solutions_by_id(
     apply_context: PlanChangeApplyContext,
-    starts_by_route_id: dict[int, int],
-) -> Callable[[], None]:
+) -> dict[int, RouteSolution]:
     route_solutions_by_id: dict[int, object] = {}
     for route_solutions in apply_context.route_solutions_by_local_delivery_id.values():
         for route_solution in route_solutions:
             if getattr(route_solution, "id", None) is None:
                 continue
             route_solutions_by_id[route_solution.id] = route_solution
-
-    def _sync() -> None:
-        for route_id, start_position in starts_by_route_id.items():
-            route_solution = route_solutions_by_id.get(route_id)
-            if not route_solution:
-                continue
-            if route_solution.is_optimized not in {IS_OPTIMIZED_OPTIMIZE, IS_OPTIMIZED_PARTIAL}:
-                continue
-            delivery_plan = None
-            if route_solution.local_delivery_plan:
-                delivery_plan = route_solution.local_delivery_plan.delivery_plan
-            orders_by_id = {
-                order.id: order
-                for order in ((delivery_plan.orders or []) if delivery_plan else [])
-                if getattr(order, "id", None) is not None
-            }
-            try:
-                refresh_route_solution_incremental(
-                    route_solution=route_solution,
-                    orders_by_id=orders_by_id,
-                    recompute_from_position=start_position,
-                    time_zone=ctx.time_zone,
-                )
-            except Exception as exc:
-                _mark_stops_stale(route_solution, start_position)
-                ctx.set_warning(
-                    f"Route timings could not be refreshed for route {route_solution.id}: {exc}"
-                )
-
-    return _sync
+    return route_solutions_by_id
 
 
-def _mark_stops_stale(route_solution, start_position: int) -> None:
-    start_position = max(1, int(start_position or 1))
-    route_solution.end_leg_polyline = None
-    if start_position <= 1:
-        route_solution.start_leg_polyline = None
+def _merge_changed_stops(
+    created_stops: list[RouteSolutionStop],
+    synced_stops: list[RouteSolutionStop],
+) -> list[RouteSolutionStop]:
+    merged = list(created_stops or []) + list(synced_stops or [])
+    deduped: list[RouteSolutionStop] = []
+    seen_ids: set[tuple[str, str]] = set()
 
-    anchor_position = start_position - 1
-    for stop in route_solution.stops or []:
-        order = stop.stop_order or 0
-        if order >= start_position:
-            stop.expected_arrival_time = None
-            stop.eta_status = "stale"
-            stop.in_range = False
-            stop.reason_was_skipped = "Route timing unavailable"
-            stop.has_constraint_violation = False
-            stop.constraint_warnings = None
-            stop.to_next_polyline = None
-        elif anchor_position >= 1 and order == anchor_position:
-            stop.to_next_polyline = None
+    for stop in merged:
+        stop_id = getattr(stop, "id", None)
+        client_id = getattr(stop, "client_id", None)
+        key = (
+            "id" if stop_id is not None else "client_id",
+            str(stop_id if stop_id is not None else client_id),
+        )
+        if key in seen_ids:
+            continue
+        seen_ids.add(key)
+        deduped.append(stop)
+
+    return sorted(
+        deduped,
+        key=lambda stop: (
+            stop.stop_order if getattr(stop, "stop_order", None) is not None else 10**9,
+            getattr(stop, "id", 10**9),
+            getattr(stop, "client_id", ""),
+        ),
+    )
+
+
+def _merge_changed_route_solutions(
+    route_solutions: list[RouteSolution],
+) -> list[RouteSolution]:
+    deduped: list[RouteSolution] = []
+    seen_ids: set[int] = set()
+    for route_solution in route_solutions or []:
+        route_id = getattr(route_solution, "id", None)
+        if route_id is None or route_id in seen_ids:
+            continue
+        seen_ids.add(route_id)
+        deduped.append(route_solution)
+    return deduped

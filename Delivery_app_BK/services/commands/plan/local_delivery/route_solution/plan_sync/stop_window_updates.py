@@ -23,11 +23,11 @@ def apply_time_window_update(
     old_start = ensure_utc(old_start)
     new_start = ensure_utc(new_start)
     new_end = ensure_utc(new_end)
-
+  
     shift_delta = None
-    if shift_times and new_start and old_start and new_start > old_start:
+    if shift_times and new_start and old_start and new_start != old_start:
         shift_delta = new_start - old_start
-
+   
     has_updates = False
     has_violation = False
 

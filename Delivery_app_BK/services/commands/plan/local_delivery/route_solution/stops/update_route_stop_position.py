@@ -117,17 +117,8 @@ def update_route_stop_position(
     affected_start_position = min(current_position, position)
 
 
-    if route_solution.is_optimized == IS_OPTIMIZED_NOT_OPTIMIZED:
-        db.session.add_all(touched_stops)
-        db.session.commit()
-        return {
-            "route_solution_stops": [
-                serialize_stop_short(stop)
-                for stop in _dedupe_and_sort_stops(touched_stops)
-            ],
-        }
-
-    route_solution.is_optimized = IS_OPTIMIZED_PARTIAL
+    if route_solution.is_optimized != IS_OPTIMIZED_NOT_OPTIMIZED:
+        route_solution.is_optimized = IS_OPTIMIZED_PARTIAL
     
     effective_time_zone = ctx.time_zone
     orders_by_id = _orders_by_id_for_route_solution(route_solution)
@@ -144,6 +135,8 @@ def update_route_stop_position(
         ctx.set_warning(
             f"Route timings could not be refreshed after stop reorder: {exc}"
         )
+
+   
   
     db.session.add(route_solution)
     db.session.add_all(_dedupe_and_sort_stops(touched_stops + refreshed_stops))

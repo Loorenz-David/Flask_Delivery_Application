@@ -23,8 +23,9 @@ from Delivery_app_BK.services.commands.plan.create_plan import (
 from Delivery_app_BK.services.commands.plan.update_plan import (
     update_plan as update_plan_service,
 )
-from Delivery_app_BK.services.commands.plan.orchestrator import (
-    update_local_delivery_plan_settings as update_local_delivery_plan_settings_service,
+
+from Delivery_app_BK.services.commands.plan.local_delivery.update_settings import (
+    update_local_delivery_settings as update_local_delivery_plan_settings_service
 )
 from Delivery_app_BK.services.commands.plan.delete_plan import (
     delete_plan as delete_plan_service,
@@ -159,7 +160,7 @@ def update_local_delivery_plan_settings():
 
     if outcome.error:
         return response.build_unsuccessful_response(outcome.error)
-
+   
     return response.build_successful_response(
         outcome.data,
         warnings=ctx.warnings,

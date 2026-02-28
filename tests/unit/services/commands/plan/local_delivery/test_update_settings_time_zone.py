@@ -70,7 +70,7 @@ def test_update_local_delivery_settings_uses_identity_timezone_when_missing_in_p
     monkeypatch.setattr(
         module,
         "build_local_delivery_settings_response",
-        lambda ctx, route_solution, stops_changed: {},
+        lambda ctx, route_solution, stops_changed, route_solution_changed: {},
     )
 
     module.update_local_delivery_settings(
@@ -120,7 +120,7 @@ def test_update_local_delivery_settings_uses_context_timezone_even_when_payload_
     monkeypatch.setattr(
         module,
         "build_local_delivery_settings_response",
-        lambda ctx, route_solution, stops_changed: {},
+        lambda ctx, route_solution, stops_changed, route_solution_changed: {},
     )
 
     module.update_local_delivery_settings(
