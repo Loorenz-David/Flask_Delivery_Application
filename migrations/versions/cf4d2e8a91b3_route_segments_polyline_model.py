@@ -1,4 +1,4 @@
-l"""route segments polyline model
+""" route segments polyline model
 
 Revision ID: cf4d2e8a91b3
 Revises: 134a055dd777
