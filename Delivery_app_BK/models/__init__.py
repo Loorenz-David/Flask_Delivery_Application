@@ -24,9 +24,14 @@ from .tables.items.item_property import ItemProperty
 from .tables.items.item_state import ItemState
 from .tables.items.item_position import ItemPosition
 from .tables.order.order import Order
+from .tables.order.order_delivery_window import OrderDeliveryWindow
 from .tables.order.order_audit_log import OrderAuditLog
 from .tables.order.order_event import OrderEvent
 from .tables.order.order_event_action import OrderEventAction
+from .tables.costumer.costumer import Costumer
+from .tables.costumer.costumer_address import CostumerAddress
+from .tables.costumer.costumer_phone import CostumerPhone
+from .tables.costumer.costumer_operating_hours import CostumerOperatingHours
 from .tables.delivery_plan.delivery_plan import DeliveryPlan
 from .tables.delivery_plan.delivery_plan_event import DeliveryPlanEvent
 from .tables.delivery_plan.delivery_plan_event_action import DeliveryPlanEventAction

@@ -119,6 +119,7 @@ def create_route_optimization():
         incoming_data=incoming_data,
         identity=identity,
     )
+
     outcome = optimize_local_delivery_plan(ctx)
     response = Response()
 
@@ -141,8 +142,10 @@ def update_route_optimization():
         incoming_data=incoming_data,
         identity=identity,
     )
-    outcome = optimize_local_delivery_plan(ctx)
     response = Response()
+   
+    
+    outcome = optimize_local_delivery_plan(ctx)
 
     if outcome.error:
         return response.build_unsuccessful_response(outcome.error)

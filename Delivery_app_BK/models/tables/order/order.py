@@ -73,6 +73,12 @@ class Order(
         Integer, 
         ForeignKey("delivery_plan.id", ondelete="SET NULL"), 
     )
+    costumer_id = Column(
+        Integer,
+        ForeignKey("costumer.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     archive_at = Column(UTCDateTime)
     
@@ -118,6 +124,20 @@ class Order(
     delivery_plan = relationship(
         "DeliveryPlan",
         back_populates = "orders" 
+    )
+
+    costumer = relationship(
+        "Costumer",
+        back_populates="orders",
+        lazy="selectin",
+    )
+
+    delivery_windows = relationship(
+        "OrderDeliveryWindow",
+        back_populates="order",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        lazy="selectin",
     )
 
     team = relationship(
