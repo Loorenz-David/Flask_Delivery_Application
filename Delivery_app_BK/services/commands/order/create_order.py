@@ -3,7 +3,7 @@ from collections.abc import Callable
 
 from sqlalchemy.exc import InvalidRequestError
 
-from Delivery_app_BK.errors import NotFound
+from Delivery_app_BK.errors import NotFound, ValidationFailed
 from Delivery_app_BK.services.infra.events.builders.order import (
     build_order_created_event,
 )
@@ -21,6 +21,7 @@ from Delivery_app_BK.models import (
 from ...context import ServiceContext
 from ...requests.order.create_order import OrderCreateRequest, parse_create_order_request
 from ..base.create_instance import create_instance
+from ..costumer import CostumerResolutionInput, resolve_or_create_costumers
 from ..utils import extract_fields
 from .create_serializers import (
     serialize_created_items,
@@ -48,6 +49,22 @@ def create_order(ctx: ServiceContext):
     pending_events: list[dict] = []
     created_bundles: list[dict] = []
     def _apply() -> None:
+        resolved_costumers = resolve_or_create_costumers(
+            ctx,
+            [
+                CostumerResolutionInput(
+                    costumer_id=request.costumer_id,
+                    first_name=request.fields.get("client_first_name"),
+                    last_name=request.fields.get("client_last_name"),
+                    email=request.fields.get("client_email"),
+                    primary_phone=request.fields.get("client_primary_phone"),
+                    address=request.fields.get("client_address"),
+                )
+                for request in order_requests
+            ],
+        )
+        if len(resolved_costumers) != len(order_requests):
+            raise ValidationFailed("Failed to resolve costumers for all orders.")
         delivery_plans_by_id = _load_delivery_plans_by_id(
             ctx,
             [
@@ -63,7 +80,7 @@ def create_order(ctx: ServiceContext):
         items_by_order_client_id: dict[str, list[Item]] = defaultdict(list)
         plan_objective_results_by_order_client_id: dict[str, PlanObjectiveCreateResult] = {}
 
-        for order_request in order_requests:
+        for order_request, resolved_costumer in zip(order_requests, resolved_costumers):
             order_fields = dict(order_request.fields)
             delivery_plan = (
                 delivery_plans_by_id.get(order_request.delivery_plan_id)
@@ -78,6 +95,9 @@ def create_order(ctx: ServiceContext):
             order_fields.pop("delivery_plan_id", None)
 
             order_instance: Order = create_instance(ctx, Order, order_fields)
+            order_instance.costumer_id = resolved_costumer.id
+            if order_instance.costumer_id is None:
+                raise ValidationFailed("Order must belong to a costumer.")
             if resolved_delivery_plan_id is not None:
                 order_instance.delivery_plan_id = resolved_delivery_plan_id
             order_instances.append(order_instance)

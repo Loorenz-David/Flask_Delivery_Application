@@ -22,6 +22,7 @@ from Delivery_app_BK.services.requests.common.types import (
 
 ORDER_ALLOWED_FIELDS = {
     "client_id",
+    "costumer_id",
     "order_plan_objective",
     "reference_number",
     "external_order_id",
@@ -124,6 +125,7 @@ class OrderCreateRequest:
     fields: dict
     items: list[ItemCreateRequest]
     delivery_plan_id: int | None
+    costumer_id: int | None
 
 
 def parse_create_order_request(raw_fields: dict) -> OrderCreateRequest:
@@ -149,6 +151,7 @@ def parse_create_order_request(raw_fields: dict) -> OrderCreateRequest:
     delivery_plan_id = _parse_delivery_plan_id(raw_fields.get("delivery_plan_id"))
     if delivery_plan_id is not None:
         order_fields["delivery_plan_id"] = delivery_plan_id
+    costumer_id = _parse_costumer_id(raw_fields.get("costumer_id"))
 
     for field in ORDER_OPTIONAL_STRING_FIELDS:
         if field in raw_fields:
@@ -215,6 +218,7 @@ def parse_create_order_request(raw_fields: dict) -> OrderCreateRequest:
         fields=order_fields,
         items=item_requests,
         delivery_plan_id=delivery_plan_id,
+        costumer_id=costumer_id,
     )
 
 
@@ -295,3 +299,9 @@ def _parse_delivery_plan_id(value) -> int | None:
     if value is None:
         return None
     return parse_required_int(value, field="delivery_plan_id")
+
+
+def _parse_costumer_id(value) -> int | None:
+    if value is None:
+        return None
+    return parse_required_int(value, field="costumer_id")

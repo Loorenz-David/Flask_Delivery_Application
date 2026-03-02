@@ -41,6 +41,7 @@ def serialize_orders( instances: List[ Order ], ctx:ServiceContext  ):
             "creation_date": creation_date.isoformat() if creation_date else None,
             "order_state_id": instance.order_state_id,
             "delivery_plan_id": instance.delivery_plan_id,
+            "costumer_id": instance.costumer_id,
             "open_order_cases": _count_open_order_cases(instance),
         }
         if instance.archive_at is not None:

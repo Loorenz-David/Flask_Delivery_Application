@@ -37,6 +37,7 @@ def serialize_created_order(instance: Order) -> dict:
         "creation_date": creation_date.isoformat() if creation_date else None,
         "order_state_id": instance.order_state_id,
         "delivery_plan_id": instance.delivery_plan_id,
+        "costumer_id": instance.costumer_id,
         "open_order_cases": _count_open_order_cases(instance),
         "archive_at": archive_at.isoformat() if archive_at else None,
         **metrics,
