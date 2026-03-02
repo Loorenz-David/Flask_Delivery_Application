@@ -22,6 +22,7 @@ class OrderDeliveryWindow(db.Model, TeamScopedMixin):
     }
 
     id = Column(Integer, primary_key=True)
+    client_id = Column(String, index=True, nullable=True)
     order_id = Column(
         Integer,
         ForeignKey("order.id", ondelete="CASCADE"),
@@ -69,4 +70,3 @@ class OrderDeliveryWindow(db.Model, TeamScopedMixin):
             raise ValueError(f"{field_name} is required")
         if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
             raise ValueError(f"{field_name} must be timezone-aware")
-

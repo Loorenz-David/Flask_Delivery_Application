@@ -13,6 +13,12 @@ from .plan.local_delivery import (
     parse_update_local_delivery_settings_request,
 )
 from .auth import LoginRequest, parse_login_request
+from .costumer import (
+    CostumerCreateRequest,
+    CostumerUpdateTargetRequest,
+    parse_create_costumer_request,
+    parse_update_costumer_target_request,
+)
 
 __all__ = [
     "PlanCreateRequest",
@@ -29,4 +35,8 @@ __all__ = [
     "parse_update_local_delivery_settings_request",
     "LoginRequest",
     "parse_login_request",
+    "CostumerCreateRequest",
+    "parse_create_costumer_request",
+    "CostumerUpdateTargetRequest",
+    "parse_update_costumer_target_request",
 ]

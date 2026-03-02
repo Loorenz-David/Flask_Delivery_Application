@@ -14,6 +14,7 @@ class Costumer(db.Model, TeamScopedMixin):
     __tablename__ = "costumer"
 
     id = Column(Integer, primary_key=True)
+    client_id = Column(String, index=True, nullable=True)
     first_name = Column(String, nullable=False, index=True)
     last_name = Column(String, nullable=False, index=True)
     email = Column(String, nullable=True, index=True)
@@ -75,4 +76,3 @@ class Costumer(db.Model, TeamScopedMixin):
         Index("ix_costumer_team_id_email", "team_id", "email"),
         Index("ix_costumer_team_id_last_name", "team_id", "last_name"),
     )
-

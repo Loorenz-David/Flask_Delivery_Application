@@ -18,6 +18,7 @@ class CostumerOperatingHours(db.Model, TeamScopedMixin):
     __tablename__ = "costumer_operating_hours"
 
     id = Column(Integer, primary_key=True)
+    client_id = Column(String, index=True, nullable=True)
     costumer_id = Column(
         Integer,
         ForeignKey("costumer.id", ondelete="CASCADE"),
@@ -62,4 +63,3 @@ class CostumerOperatingHours(db.Model, TeamScopedMixin):
             raise ValueError(f"{key} must be a valid time in HH:MM")
 
         return value
-

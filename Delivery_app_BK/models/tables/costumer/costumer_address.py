@@ -15,6 +15,7 @@ class CostumerAddress(db.Model, TeamScopedMixin):
     __tablename__ = "costumer_address"
 
     id = Column(Integer, primary_key=True)
+    client_id = Column(String, index=True, nullable=True)
     costumer_id = Column(
         Integer,
         ForeignKey("costumer.id", ondelete="CASCADE"),
@@ -35,4 +36,3 @@ class CostumerAddress(db.Model, TeamScopedMixin):
     __table_args__ = (
         Index("ix_costumer_address_address_gin", "address", postgresql_using="gin"),
     )
-
