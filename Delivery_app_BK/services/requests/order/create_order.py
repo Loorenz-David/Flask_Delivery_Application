@@ -22,7 +22,7 @@ from Delivery_app_BK.services.requests.common.types import (
 
 ORDER_ALLOWED_FIELDS = {
     "client_id",
-    "costumer_id",
+    "costumer",
     "order_plan_objective",
     "reference_number",
     "external_order_id",
@@ -114,6 +114,16 @@ ORDER_OBJECTIVES = {
     "store_pickup",
 }
 
+COSTUMER_ALLOWED_FIELDS = {
+    "costumer_id",
+    "client_id",
+    "first_name",
+    "last_name",
+    "email",
+    "primary_phone",
+    "address",
+}
+
 
 @dataclass
 class ItemCreateRequest:
@@ -121,11 +131,22 @@ class ItemCreateRequest:
 
 
 @dataclass
+class OrderCostumerRequest:
+    costumer_id: int | None
+    client_id: str | None
+    first_name: str | None
+    last_name: str | None
+    email: str | None
+    primary_phone: dict | None
+    address: dict | None
+
+
+@dataclass
 class OrderCreateRequest:
     fields: dict
     items: list[ItemCreateRequest]
     delivery_plan_id: int | None
-    costumer_id: int | None
+    costumer: OrderCostumerRequest | None
 
 
 def parse_create_order_request(raw_fields: dict) -> OrderCreateRequest:
@@ -151,7 +172,7 @@ def parse_create_order_request(raw_fields: dict) -> OrderCreateRequest:
     delivery_plan_id = _parse_delivery_plan_id(raw_fields.get("delivery_plan_id"))
     if delivery_plan_id is not None:
         order_fields["delivery_plan_id"] = delivery_plan_id
-    costumer_id = _parse_costumer_id(raw_fields.get("costumer_id"))
+    costumer = _parse_costumer(raw_fields.get("costumer"))
 
     for field in ORDER_OPTIONAL_STRING_FIELDS:
         if field in raw_fields:
@@ -218,7 +239,7 @@ def parse_create_order_request(raw_fields: dict) -> OrderCreateRequest:
         fields=order_fields,
         items=item_requests,
         delivery_plan_id=delivery_plan_id,
-        costumer_id=costumer_id,
+        costumer=costumer,
     )
 
 
@@ -305,3 +326,26 @@ def _parse_costumer_id(value) -> int | None:
     if value is None:
         return None
     return parse_required_int(value, field="costumer_id")
+
+
+def _parse_costumer(value) -> OrderCostumerRequest | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ValidationFailed("costumer must be an object.")
+
+    validate_unexpected(
+        value,
+        COSTUMER_ALLOWED_FIELDS,
+        context_msg="Unexpected fields in costumer payload:",
+    )
+
+    return OrderCostumerRequest(
+        costumer_id=_parse_costumer_id(value.get("costumer_id")),
+        client_id=parse_optional_string(value.get("client_id"), field="costumer.client_id"),
+        first_name=parse_optional_string(value.get("first_name"), field="costumer.first_name"),
+        last_name=parse_optional_string(value.get("last_name"), field="costumer.last_name"),
+        email=parse_optional_string(value.get("email"), field="costumer.email"),
+        primary_phone=parse_optional_dict(value.get("primary_phone"), field="costumer.primary_phone"),
+        address=parse_optional_dict(value.get("address"), field="costumer.address"),
+    )

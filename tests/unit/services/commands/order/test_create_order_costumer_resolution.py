@@ -2,7 +2,10 @@ from contextlib import contextmanager
 from types import SimpleNamespace
 
 import Delivery_app_BK.services.commands.order.create_order as module
-from Delivery_app_BK.services.requests.order.create_order import OrderCreateRequest
+from Delivery_app_BK.services.requests.order.create_order import (
+    OrderCostumerRequest,
+    OrderCreateRequest,
+)
 
 
 @contextmanager
@@ -28,6 +31,7 @@ def _build_request(
     *,
     client_id: str,
     costumer_id: int | None,
+    costumer_client_id: str | None = None,
     email: str | None = None,
 ):
     return OrderCreateRequest(
@@ -39,7 +43,17 @@ def _build_request(
         },
         items=[],
         delivery_plan_id=None,
-        costumer_id=costumer_id,
+        costumer=OrderCostumerRequest(
+            costumer_id=costumer_id,
+            client_id=costumer_client_id,
+            first_name=None,
+            last_name=None,
+            email=None,
+            primary_phone=None,
+            address=None,
+        )
+        if costumer_id is not None or costumer_client_id is not None
+        else None,
     )
 
 
@@ -113,6 +127,7 @@ def test_create_order_passes_explicit_costumer_id_to_resolver(monkeypatch):
     module.create_order(SimpleNamespace(set_relationship_map=lambda *_args, **_kwargs: None))
 
     assert captured["inputs"][0].costumer_id == 88
+    assert captured["inputs"][0].costumer_client_id is None
     assert captured["inputs"][0].email == "explicit@mail.com"
 
 
@@ -128,7 +143,7 @@ def test_create_order_fallback_input_uses_order_snapshot_fields(monkeypatch):
         },
         items=[],
         delivery_plan_id=None,
-        costumer_id=None,
+        costumer=None,
     )
     _patch_create_order_dependencies(monkeypatch, [request])
     captured = {}
@@ -147,6 +162,48 @@ def test_create_order_fallback_input_uses_order_snapshot_fields(monkeypatch):
     assert captured["input"].email == "martha@mail.com"
     assert captured["input"].primary_phone == {"prefix": "+1", "number": "555"}
     assert captured["input"].address == {"street_address": "Main 1"}
+
+
+def test_create_order_prefers_nested_costumer_defaults(monkeypatch):
+    request = OrderCreateRequest(
+        fields={
+            "client_id": "order_1",
+            "client_first_name": "OrderName",
+            "client_last_name": "OrderLast",
+            "client_email": "order@mail.com",
+            "client_primary_phone": {"prefix": "+1", "number": "111"},
+            "client_address": {"street_address": "Order St"},
+        },
+        items=[],
+        delivery_plan_id=None,
+        costumer=OrderCostumerRequest(
+            costumer_id=None,
+            client_id="costumer_front_client",
+            first_name="CostumerName",
+            last_name="CostumerLast",
+            email="costumer@mail.com",
+            primary_phone={"prefix": "+46", "number": "700"},
+            address={"street_address": "Costumer St"},
+        ),
+    )
+    _patch_create_order_dependencies(monkeypatch, [request])
+    captured = {}
+
+    def _resolve(_ctx, inputs):
+        captured["input"] = inputs[0]
+        return [SimpleNamespace(id=301)]
+
+    monkeypatch.setattr(module, "resolve_or_create_costumers", _resolve)
+
+    module.create_order(SimpleNamespace(set_relationship_map=lambda *_args, **_kwargs: None))
+
+    assert captured["input"].costumer_id is None
+    assert captured["input"].costumer_client_id == "costumer_front_client"
+    assert captured["input"].first_name == "CostumerName"
+    assert captured["input"].last_name == "CostumerLast"
+    assert captured["input"].email == "costumer@mail.com"
+    assert captured["input"].primary_phone == {"prefix": "+46", "number": "700"}
+    assert captured["input"].address == {"street_address": "Costumer St"}
 
 
 def test_create_order_calls_batch_resolver_once_for_many_orders(monkeypatch):

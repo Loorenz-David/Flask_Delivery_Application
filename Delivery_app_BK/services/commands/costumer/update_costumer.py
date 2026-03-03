@@ -288,11 +288,16 @@ def _apply_operating_hours_mutations(instance: Costumer, fields: dict[str, Any],
         for existing in list(instance.operating_hours or []):
             db.session.delete(existing)
         instance.operating_hours = []
+        # Ensure deleted weekday rows are removed before inserting replacements.
+        db.session.flush()
 
     if "operating_hours" not in fields:
         return
 
     payload = fields.get("operating_hours")
+    if not isinstance(payload, list):
+        raise ValidationFailed("operating_hours must be a list")
+
     existing_by_weekday = {row.weekday: row for row in (instance.operating_hours or [])}
 
     for row in payload:

@@ -1,4 +1,4 @@
-from Delivery_app_BK.models import db, User
+from Delivery_app_BK.models import db, User, Team
 from Delivery_app_BK.errors import ValidationFailed
 
 from ...context import ServiceContext
@@ -23,4 +23,6 @@ def login_user_service( ctx:ServiceContext ):
     if not user.check_password( login_request.password ):
         raise ValidationFailed( "Incorrect login information." ) 
     
-    return build_user_tokens(user, time_zone=login_request.time_zone)
+
+
+    return build_user_tokens(user)

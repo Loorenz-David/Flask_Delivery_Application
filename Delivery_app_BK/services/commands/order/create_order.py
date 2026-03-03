@@ -53,12 +53,33 @@ def create_order(ctx: ServiceContext):
             ctx,
             [
                 CostumerResolutionInput(
-                    costumer_id=request.costumer_id,
-                    first_name=request.fields.get("client_first_name"),
-                    last_name=request.fields.get("client_last_name"),
-                    email=request.fields.get("client_email"),
-                    primary_phone=request.fields.get("client_primary_phone"),
-                    address=request.fields.get("client_address"),
+                    costumer_id=request.costumer.costumer_id if request.costumer else None,
+                    costumer_client_id=request.costumer.client_id if request.costumer else None,
+                    first_name=(
+                        request.costumer.first_name
+                        if request.costumer and request.costumer.first_name is not None
+                        else request.fields.get("client_first_name")
+                    ),
+                    last_name=(
+                        request.costumer.last_name
+                        if request.costumer and request.costumer.last_name is not None
+                        else request.fields.get("client_last_name")
+                    ),
+                    email=(
+                        request.costumer.email
+                        if request.costumer and request.costumer.email is not None
+                        else request.fields.get("client_email")
+                    ),
+                    primary_phone=(
+                        request.costumer.primary_phone
+                        if request.costumer and request.costumer.primary_phone is not None
+                        else request.fields.get("client_primary_phone")
+                    ),
+                    address=(
+                        request.costumer.address
+                        if request.costumer and request.costumer.address is not None
+                        else request.fields.get("client_address")
+                    ),
                 )
                 for request in order_requests
             ],
