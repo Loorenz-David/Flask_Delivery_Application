@@ -19,7 +19,7 @@ def list_costumers(ctx: ServiceContext):
     )
 
     query = find_costumers(ctx.query_params, ctx, query=base_query)
-    limit = int(ctx.query_params.get("limit", 50))
+    limit = int(ctx.query_params.get("limit", 10))
     results = query.limit(limit + 1).all()
     has_more = len(results) > limit
     page_instances = results[:limit]
@@ -34,7 +34,6 @@ def list_costumers(ctx: ServiceContext):
 
     return {
         "costumer": serialize_costumers(page_instances),
-        "costumer_stats": costumer_stats(ctx, base_query=query),
         "costumer_pagination": pagination,
     }
 
