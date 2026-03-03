@@ -21,3 +21,4 @@ class Team(db.Model):
     # a dictionary made to check if the user has a valid subscription to use some properties
     # last thing to develop
     subscription = Column(JSONB().with_variant(JSON, "sqlite"))
+    time_zone = Column(String(64), nullable=False, default= lambda: datetime.now(timezone.utc)) # IANA  timezone identifier

@@ -1,7 +1,7 @@
 from datetime import timedelta
 from flask_jwt_extended import create_access_token, create_refresh_token
 
-from Delivery_app_BK.models import User, UserRole, BaseRole
+from Delivery_app_BK.models import User,Team, UserRole, BaseRole
 
 
 def _build_auth_claims(user: User, *, time_zone: str | None) -> dict:
@@ -18,12 +18,13 @@ def _build_auth_claims(user: User, *, time_zone: str | None) -> dict:
     }
 
 
-def build_user_tokens(user: User, *, time_zone: str | None = None) -> dict:
+def build_user_tokens(user: User) -> dict:
     user_role: UserRole = user.user_role
     base_role: BaseRole = user_role.base_role
-
+    team:Team = user.team
     identity_data = str(user.id)
-    claims = _build_auth_claims(user, time_zone=time_zone)
+
+    claims = _build_auth_claims(user, time_zone= team.time_zone)
 
     access_token = create_access_token(identity=identity_data, additional_claims=claims)
     refresh_token = create_refresh_token(identity=identity_data, additional_claims=claims)

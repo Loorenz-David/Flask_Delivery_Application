@@ -4,7 +4,12 @@ from .plan import (
     parse_create_plan_request,
     parse_update_plan_state_request,
 )
-from .order import ItemCreateRequest, OrderCreateRequest, parse_create_order_request
+from .order import (
+    ItemCreateRequest,
+    OrderCostumerRequest,
+    OrderCreateRequest,
+    parse_create_order_request,
+)
 from .plan.local_delivery import (
     DeliveryPlanPatchRequest,
     LocalDeliveryPlanPatchRequest,
@@ -26,6 +31,7 @@ __all__ = [
     "PlanStateUpdateRequest",
     "parse_update_plan_state_request",
     "ItemCreateRequest",
+    "OrderCostumerRequest",
     "OrderCreateRequest",
     "parse_create_order_request",
     "DeliveryPlanPatchRequest",
