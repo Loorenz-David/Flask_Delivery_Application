@@ -13,6 +13,7 @@ def test_validate_targets_allows_mutable_fields():
             "fields": {
                 "client_first_name": "Ana",
                 "earliest_delivery_date": "2026-03-01T10:00:00Z",
+                "delivery_windows": [],
             },
         }
     ]

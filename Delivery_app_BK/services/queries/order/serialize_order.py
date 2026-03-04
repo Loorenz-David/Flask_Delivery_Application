@@ -1,6 +1,9 @@
 from typing import List
 from Delivery_app_BK.models import Order
 from Delivery_app_BK.services.domain.order.order_case_states import OrderCaseState
+from Delivery_app_BK.services.domain.order.delivery_windows import (
+    sort_delivery_window_instances,
+)
 
 from ...context import ServiceContext
 from ..utils import map_return_values, calculate_order_metrics
@@ -19,6 +22,9 @@ def serialize_orders( instances: List[ Order ], ctx:ServiceContext  ):
         creation_date = instance.creation_date
         earliest_delivery_date = instance.earliest_delivery_date
         latest_delivery_date = instance.latest_delivery_date
+        delivery_windows = sort_delivery_window_instances(
+            list(getattr(instance, "delivery_windows", None) or []),
+        )
         unpacked = {
             "id": instance.id,
             "client_id": instance.client_id,
@@ -42,6 +48,16 @@ def serialize_orders( instances: List[ Order ], ctx:ServiceContext  ):
             "order_state_id": instance.order_state_id,
             "delivery_plan_id": instance.delivery_plan_id,
             "costumer_id": instance.costumer_id,
+            "delivery_windows": [
+                {
+                    "id": row.id,
+                    "client_id": row.client_id,
+                    "start_at": row.start_at.isoformat() if row.start_at else None,
+                    "end_at": row.end_at.isoformat() if row.end_at else None,
+                    "window_type": row.window_type,
+                }
+                for row in delivery_windows
+            ],
             "open_order_cases": _count_open_order_cases(instance),
         }
         if instance.archive_at is not None:

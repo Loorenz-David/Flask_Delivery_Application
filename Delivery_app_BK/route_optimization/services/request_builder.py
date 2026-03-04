@@ -72,8 +72,6 @@ def build_request(context: OptimizationContext) -> OptimizationRequest:
         context,
         incoming_data,
     )
-    
-    print(global_start_time, ' and end: ', global_end_time)
 
     route_modifiers = dict(DEFAULT_ROUTE_MODIFIERS)
     if isinstance(incoming_data.get("route_modifiers"), dict):
@@ -137,6 +135,10 @@ def _build_shipments(context: OptimizationContext) -> List[Shipment]:
 
 
 def _build_time_windows(order, context: OptimizationContext) -> List[TimeWindow]:
+    delivery_windows = _build_delivery_windows_from_order(order)
+    if delivery_windows:
+        return delivery_windows
+
     windows: List[TimeWindow] = []
 
     earliest = _coerce_datetime(order.earliest_delivery_date)
@@ -163,6 +165,45 @@ def _build_time_windows(order, context: OptimizationContext) -> List[TimeWindow]
             preferred_end=preferred_end,
             context=context,
         )
+
+    return windows
+
+
+def _build_delivery_windows_from_order(order) -> List[TimeWindow]:
+    rows = list(getattr(order, "delivery_windows", None) or [])
+    if not rows:
+        return []
+
+    if len(rows) > 14:
+        raise ValidationFailed(f"Order {order.id} exceeds max delivery windows (14).")
+
+    sorted_rows = sorted(
+        rows,
+        key=lambda row: (
+            _coerce_datetime(getattr(row, "start_at", None)) or datetime.min.replace(tzinfo=timezone.utc),
+            _coerce_datetime(getattr(row, "end_at", None)) or datetime.min.replace(tzinfo=timezone.utc),
+        ),
+    )
+
+    windows: List[TimeWindow] = []
+    previous_end: Optional[datetime] = None
+    for index, row in enumerate(sorted_rows):
+        start = _coerce_datetime(getattr(row, "start_at", None))
+        end = _coerce_datetime(getattr(row, "end_at", None))
+        if not start or not end:
+            raise ValidationFailed(
+                f"Order {order.id} has invalid delivery window at index {index}.",
+            )
+        if end <= start:
+            raise ValidationFailed(
+                f"Order {order.id} has delivery window with end_at <= start_at at index {index}.",
+            )
+        if previous_end and start < previous_end:
+            raise ValidationFailed(
+                f"Order {order.id} has overlapping delivery windows.",
+            )
+        windows.append(TimeWindow(start_time=start, end_time=end))
+        previous_end = end
 
     return windows
 

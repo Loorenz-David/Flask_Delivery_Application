@@ -4,13 +4,14 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy.exc import InvalidRequestError
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.orm.exc import NoResultFound
 
 from Delivery_app_BK.errors import ValidationFailed
 from Delivery_app_BK.models import (
     DeliveryPlan,
     Order,
+    OrderDeliveryWindow,
     db,
 )
 from Delivery_app_BK.services.commands.order.create_serializers import (
@@ -27,6 +28,12 @@ from Delivery_app_BK.services.infra.events.builders.order import (
 )
 from Delivery_app_BK.services.infra.events.emiters.order import emit_order_events
 from Delivery_app_BK.services.utils import model_requires_team, require_team_id, to_datetime
+from Delivery_app_BK.services.domain.order.delivery_windows import (
+    derive_legacy_delivery_envelope_fields,
+    resolve_order_delivery_windows_timezone,
+    validate_and_normalize_delivery_windows,
+    validate_same_local_day_delivery_windows,
+)
 
 from ...context import ServiceContext
 from ..utils import extract_targets
@@ -63,6 +70,7 @@ MUTABLE_FIELDS = {
     "latest_delivery_date",
     "preferred_time_start",
     "preferred_time_end",
+    "delivery_windows",
 }
 
 ADDRESS_FIELDS = {"client_address"}
@@ -71,6 +79,7 @@ WINDOW_FIELDS = {
     "latest_delivery_date",
     "preferred_time_start",
     "preferred_time_end",
+    "delivery_windows",
 }
 
 
@@ -139,11 +148,24 @@ def apply_order_updates(
     pending_events: list[dict[str, Any]] = []
     order_deltas: list[OrderUpdateDelta] = []
     existing_orders = _resolve_orders_by_targets(ctx, targets)
+    team_timezone = resolve_order_delivery_windows_timezone(ctx)
 
     for order_target in targets:
         target_id = order_target["target_id"]
+        raw_fields = order_target["fields"]
         existing: Order = existing_orders[target_id]
-        fields_to_apply = _build_mutable_fields(order_target["fields"])
+        fields_to_apply = _build_mutable_fields(raw_fields)
+        normalized_delivery_windows = _normalize_delivery_windows_for_update(
+            raw_fields=raw_fields,
+            team_timezone=team_timezone,
+        )
+        if normalized_delivery_windows is not None:
+            fields_to_apply.update(
+                derive_legacy_delivery_envelope_fields(
+                    normalized_delivery_windows,
+                    team_timezone=team_timezone,
+                ),
+            )
 
         old_values = _capture_sync_values(existing)
         old_earliest: datetime = to_datetime(existing.earliest_delivery_date)
@@ -151,6 +173,12 @@ def apply_order_updates(
 
         if fields_to_apply:
             inject_fields(ctx, existing, fields_to_apply)
+        if normalized_delivery_windows is not None:
+            _replace_order_delivery_windows(
+                order=existing,
+                normalized_delivery_windows=normalized_delivery_windows,
+                team_id=ctx.team_id,
+            )
 
         new_values = _capture_sync_values(existing)
         new_earliest = to_datetime(existing.earliest_delivery_date)
@@ -245,7 +273,48 @@ def _validate_targets_update_fields(targets: list[dict[str, Any]]) -> None:
 
 
 def _build_mutable_fields(raw_fields: dict[str, Any]) -> dict[str, Any]:
-    return {key: value for key, value in raw_fields.items() if key in MUTABLE_FIELDS}
+    return {
+        key: value
+        for key, value in raw_fields.items()
+        if key in MUTABLE_FIELDS and key != "delivery_windows"
+    }
+
+
+def _normalize_delivery_windows_for_update(
+    *,
+    raw_fields: dict[str, Any],
+    team_timezone,
+):
+    if "delivery_windows" not in raw_fields:
+        return None
+
+    normalized = validate_and_normalize_delivery_windows(
+        raw_fields.get("delivery_windows"),
+    )
+    validate_same_local_day_delivery_windows(
+        normalized,
+        team_timezone=team_timezone,
+    )
+    return normalized
+
+
+def _replace_order_delivery_windows(
+    *,
+    order: Order,
+    normalized_delivery_windows,
+    team_id: int | None,
+) -> None:
+    order.delivery_windows.clear()
+    for row in normalized_delivery_windows:
+        order.delivery_windows.append(
+            OrderDeliveryWindow(
+                team_id=team_id,
+                client_id=row.client_id,
+                start_at=row.start_at,
+                end_at=row.end_at,
+                window_type=row.window_type,
+            ),
+        )
 
 
 def _resolve_orders_by_targets(
@@ -266,7 +335,7 @@ def _resolve_orders_by_targets(
     if int_ids:
         query = (
             db.session.query(Order)
-            .options(joinedload(Order.delivery_plan))
+            .options(joinedload(Order.delivery_plan), selectinload(Order.delivery_windows))
             .filter(Order.id.in_(int_ids))
         )
         if team_id is not None:
@@ -277,7 +346,7 @@ def _resolve_orders_by_targets(
     if client_ids:
         query = (
             db.session.query(Order)
-            .options(joinedload(Order.delivery_plan))
+            .options(joinedload(Order.delivery_plan), selectinload(Order.delivery_windows))
             .filter(Order.client_id.in_(client_ids))
         )
         if team_id is not None:

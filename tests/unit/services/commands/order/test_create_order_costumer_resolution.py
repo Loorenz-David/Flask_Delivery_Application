@@ -1,7 +1,8 @@
+import importlib
 from contextlib import contextmanager
 from types import SimpleNamespace
 
-import Delivery_app_BK.services.commands.order.create_order as module
+module = importlib.import_module("Delivery_app_BK.services.commands.order.create_order")
 from Delivery_app_BK.services.requests.order.create_order import (
     OrderCostumerRequest,
     OrderCreateRequest,
@@ -91,6 +92,14 @@ def _patch_create_order_dependencies(monkeypatch, requests):
     return dummy_session
 
 
+def _build_ctx():
+    return SimpleNamespace(
+        set_relationship_map=lambda *_args, **_kwargs: None,
+        team_id=None,
+        identity={},
+    )
+
+
 def test_create_order_links_costumer_ids_in_created_bundles(monkeypatch):
     requests = [
         _build_request(client_id="order_1", costumer_id=None, email="one@mail.com"),
@@ -106,7 +115,7 @@ def test_create_order_links_costumer_ids_in_created_bundles(monkeypatch):
 
     monkeypatch.setattr(module, "resolve_or_create_costumers", _resolve)
 
-    result = module.create_order(SimpleNamespace(set_relationship_map=lambda *_args, **_kwargs: None))
+    result = module.create_order(_build_ctx())
 
     assert resolver_calls["count"] == 1
     assert result["created"][0]["order"]["costumer_id"] == 101
@@ -124,7 +133,7 @@ def test_create_order_passes_explicit_costumer_id_to_resolver(monkeypatch):
 
     monkeypatch.setattr(module, "resolve_or_create_costumers", _resolve)
 
-    module.create_order(SimpleNamespace(set_relationship_map=lambda *_args, **_kwargs: None))
+    module.create_order(_build_ctx())
 
     assert captured["inputs"][0].costumer_id == 88
     assert captured["inputs"][0].costumer_client_id is None
@@ -154,7 +163,7 @@ def test_create_order_fallback_input_uses_order_snapshot_fields(monkeypatch):
 
     monkeypatch.setattr(module, "resolve_or_create_costumers", _resolve)
 
-    module.create_order(SimpleNamespace(set_relationship_map=lambda *_args, **_kwargs: None))
+    module.create_order(_build_ctx())
 
     assert captured["input"].costumer_id is None
     assert captured["input"].first_name == "Martha"
@@ -195,7 +204,7 @@ def test_create_order_prefers_nested_costumer_defaults(monkeypatch):
 
     monkeypatch.setattr(module, "resolve_or_create_costumers", _resolve)
 
-    module.create_order(SimpleNamespace(set_relationship_map=lambda *_args, **_kwargs: None))
+    module.create_order(_build_ctx())
 
     assert captured["input"].costumer_id is None
     assert captured["input"].costumer_client_id == "costumer_front_client"
@@ -221,6 +230,6 @@ def test_create_order_calls_batch_resolver_once_for_many_orders(monkeypatch):
 
     monkeypatch.setattr(module, "resolve_or_create_costumers", _resolve)
 
-    module.create_order(SimpleNamespace(set_relationship_map=lambda *_args, **_kwargs: None))
+    module.create_order(_build_ctx())
 
     assert resolver_calls["count"] == 1

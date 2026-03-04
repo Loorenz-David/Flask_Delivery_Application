@@ -86,11 +86,13 @@ def update_route_solution_from_plan(
 
     if window_changed and new_window and old_window:
         shift_times = not has_address_change
+        orders_by_id = _orders_by_id(route_solution)
         window_changes, has_violation = apply_time_window_update(
             route_solution,
             old_window,
             new_window,
             shift_times=shift_times,
+            orders_by_id=orders_by_id,
         )
         stops_changed = stops_changed or window_changes
         apply_expected_end_shift_from_window(
@@ -104,11 +106,13 @@ def update_route_solution_from_plan(
     elif has_time_change and new_window:
         # Time text can change without changing parsed window boundaries.
         # Rebuild route-window warnings to keep stop-level violations current.
+        orders_by_id = _orders_by_id(route_solution)
         warning_changes, has_violation = apply_time_window_update(
             route_solution,
             new_window,
             new_window,
             shift_times=False,
+            orders_by_id=orders_by_id,
         )
         stops_changed = stops_changed or warning_changes
         if has_violation and route_solution.is_optimized != IS_OPTIMIZED_NOT_OPTIMIZED:

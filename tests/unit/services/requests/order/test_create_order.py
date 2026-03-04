@@ -53,3 +53,28 @@ def test_parse_create_order_preserves_existing_fields_behavior():
     assert parsed.fields["delivery_plan_id"] == 3
     assert parsed.fields["reference_number"] == "REF-1"
     assert parsed.fields["order_state_id"] == 2
+
+
+def test_parse_create_order_preserves_delivery_windows_payload():
+    parsed = parse_create_order_request(
+        {
+            "client_id": "order_1",
+            "delivery_windows": [
+                {
+                    "client_id": "dw_1",
+                    "start_at": "2026-03-05T09:00:00+00:00",
+                    "end_at": "2026-03-05T11:00:00+00:00",
+                    "window_type": "FULL_RANGE",
+                }
+            ],
+        },
+    )
+
+    assert parsed.delivery_windows is not None
+    assert parsed.delivery_windows[0]["client_id"] == "dw_1"
+    assert parsed.delivery_windows[0]["window_type"] == "FULL_RANGE"
+
+
+def test_parse_create_order_delivery_windows_null_means_explicit_clear():
+    parsed = parse_create_order_request({"delivery_windows": None})
+    assert parsed.delivery_windows == []

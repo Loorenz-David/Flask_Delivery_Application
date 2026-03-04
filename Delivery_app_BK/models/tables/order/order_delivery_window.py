@@ -1,7 +1,7 @@
 # Third-party dependencies
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, ForeignKey, Integer, String
+from sqlalchemy import CheckConstraint, Column, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import relationship, validates
 
 # Local application imports
@@ -33,6 +33,10 @@ class OrderDeliveryWindow(db.Model, TeamScopedMixin):
     end_at = Column(UTCDateTime, nullable=False, index=True)
     window_type = Column(String, nullable=False)
     created_at = Column(UTCDateTime, default=lambda: datetime.now(timezone.utc))
+    __table_args__ = (
+        CheckConstraint("end_at > start_at", name="ck_order_delivery_window_end_after_start"),
+        Index("ix_order_delivery_window_order_id_start_at", "order_id", "start_at"),
+    )
 
     order = relationship(
         "Order",
@@ -52,16 +56,16 @@ class OrderDeliveryWindow(db.Model, TeamScopedMixin):
     def validate_start_at(self, key, value):
         self._validate_aware_datetime("start_at", value)
         end_at = getattr(self, "end_at", None)
-        if end_at is not None and end_at < value:
-            raise ValueError("end_at must be greater than or equal to start_at")
+        if end_at is not None and end_at <= value:
+            raise ValueError("end_at must be greater than start_at")
         return value
 
     @validates("end_at")
     def validate_end_at(self, key, value):
         self._validate_aware_datetime("end_at", value)
         start_at = getattr(self, "start_at", None)
-        if start_at is not None and value < start_at:
-            raise ValueError("end_at must be greater than or equal to start_at")
+        if start_at is not None and value <= start_at:
+            raise ValueError("end_at must be greater than start_at")
         return value
 
     @staticmethod
