@@ -16,6 +16,7 @@ def list_costumers(ctx: ServiceContext):
         selectinload(Costumer.addresses),
         selectinload(Costumer.phones),
         selectinload(Costumer.operating_hours),
+        selectinload(Costumer.orders),
     )
 
     query = find_costumers(ctx.query_params, ctx, query=base_query)
@@ -33,7 +34,6 @@ def list_costumers(ctx: ServiceContext):
     )
 
     return {
-        "costumer": serialize_costumers(page_instances),
+        "costumer": serialize_costumers(page_instances, include_order_count=True),
         "costumer_pagination": pagination,
     }
-

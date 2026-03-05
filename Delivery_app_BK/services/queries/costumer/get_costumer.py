@@ -9,7 +9,10 @@ from .serialize_costumer import serialize_costumers
 
 
 def get_costumer( costumer_id: int, ctx:ServiceContext ):
-    query = db.session.query(Costumer).options(selectinload(Costumer.operating_hours))
+    query = db.session.query(Costumer).options(
+        selectinload(Costumer.operating_hours),
+        selectinload(Costumer.orders),
+    )
     if ctx.team_id:
         query = query.filter(Costumer.team_id == ctx.team_id)
     found_costumer = query.filter(Costumer.id == costumer_id).first()
@@ -18,7 +21,8 @@ def get_costumer( costumer_id: int, ctx:ServiceContext ):
         raise NotFound(f"costumer with id: {costumer_id} does not exist.")    
     
     serialize_object = serialize_costumers(
-        instances = [ found_costumer ]
+        instances = [ found_costumer ],
+        include_order_count=True,
     )
 
     return {
