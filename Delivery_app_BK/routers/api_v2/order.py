@@ -32,6 +32,10 @@ from Delivery_app_BK.services.commands.order.delete_order import (
 from Delivery_app_BK.services.commands.order.update_order_delivery_plan import (
     update_order_delivery_plan as update_order_delivery_plan_service,
 )
+from Delivery_app_BK.services.commands.order.update_order_delivery_plan_batch import (
+    resolve_orders_selection as resolve_orders_selection_service,
+    update_orders_delivery_plan_batch as update_orders_delivery_plan_batch_service,
+)
 from Delivery_app_BK.services.commands.order.order_states.update_orders_state import (
     update_orders_state as update_orders_state_service,
 )
@@ -251,6 +255,58 @@ def update_order_delivery_plan(order_id: int, plan_id: int):
     )
     outcome = run_service(
         lambda c: update_order_delivery_plan_service(c, order_id, plan_id),
+        ctx,
+    )
+    response = Response()
+
+    if outcome.error:
+        return response.build_unsuccessful_response(outcome.error)
+
+    return response.build_successful_response(
+        outcome.data,
+        warnings=ctx.warnings,
+    )
+
+
+@order_bp.route("/selection/resolve", methods=["POST"])
+@jwt_required()
+@role_required([ADMIN, ASSISTANT, DRIVER])
+def resolve_order_batch_selection():
+    identity = get_jwt()
+    incoming_data = request.get_json(silent=True) or {}
+    ctx = ServiceContext(
+        incoming_data=incoming_data,
+        identity=identity,
+    )
+    outcome = run_service(
+        lambda c: resolve_orders_selection_service(c),
+        ctx,
+    )
+    response = Response()
+
+    if outcome.error:
+        return response.build_unsuccessful_response(outcome.error)
+
+    return response.build_successful_response(
+        outcome.data,
+        warnings=ctx.warnings,
+    )
+
+
+@order_bp.route("/plan/<int:plan_id>/batch", methods=["PATCH"])
+@jwt_required()
+@role_required([ADMIN, ASSISTANT, DRIVER])
+def update_orders_delivery_plan_batch(plan_id: int):
+    identity = get_jwt()
+    incoming_data = request.get_json(silent=True) or {}
+    prevent_event_bus = incoming_data.pop("prevent_event_bus", False)
+    ctx = ServiceContext(
+        incoming_data=incoming_data,
+        identity=identity,
+        prevent_event_bus=prevent_event_bus,
+    )
+    outcome = run_service(
+        lambda c: update_orders_delivery_plan_batch_service(c, plan_id),
         ctx,
     )
     response = Response()

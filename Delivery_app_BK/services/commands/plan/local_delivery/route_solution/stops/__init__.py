@@ -5,6 +5,7 @@ from .factory import (
 from .removal import remove_order_stops_for_local_delivery
 from .removal import remove_orders_stops_for_local_delivery
 from .update_route_stop_position import update_route_stop_position
+from .update_route_stop_group_position import update_route_stop_group_position
 
 __all__ = [
     "build_route_solution_stops",
@@ -12,4 +13,5 @@ __all__ = [
     "remove_order_stops_for_local_delivery",
     "remove_orders_stops_for_local_delivery",
     "update_route_stop_position",
+    "update_route_stop_group_position",
 ]
