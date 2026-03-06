@@ -52,6 +52,7 @@ def create_plan(ctx: ServiceContext):
                 ctx=ctx,
                 plan_type=item.plan_type,
                 plan_instance=plan_instance,
+                plan_type_defaults=item.plan_type_defaults,
             )
             creation_context.append(
                 {
