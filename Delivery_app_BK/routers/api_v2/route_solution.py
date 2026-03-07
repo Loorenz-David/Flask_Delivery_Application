@@ -13,6 +13,12 @@ from Delivery_app_BK.services.run_service import run_service
 from Delivery_app_BK.services.commands.plan.local_delivery.route_solution.stops.update_route_stop_position import (
     update_route_stop_position as update_route_stop_position_service,
 )
+from Delivery_app_BK.services.commands.plan.local_delivery.route_solution.stops.update_route_stop_group_position import (
+    update_route_stop_group_position as update_route_stop_group_position_service,
+)
+from Delivery_app_BK.services.commands.plan.local_delivery.route_solution.stops.update_route_stop_service_time import (
+    update_route_stop_service_time as update_route_stop_service_time_service,
+)
 
 
 from Delivery_app_BK.services.commands.plan.local_delivery.route_solution.select_route_solution import (
@@ -47,6 +53,71 @@ def update_route_stop_position(
             c,
             route_stop_id,
             position,
+        ),
+        ctx,
+    )
+    response = Response()
+
+    if outcome.error:
+        return response.build_unsuccessful_response(outcome.error)
+
+    return response.build_successful_response(
+        outcome.data or {},
+        warnings=ctx.warnings,
+    )
+
+
+@route_solution_bp.route(
+    "/stops/group-position",
+    methods=["PATCH"],
+)
+@jwt_required()
+@role_required([ADMIN, ASSISTANT, DRIVER])
+def update_route_stop_group_position():
+    identity = get_jwt()
+    incoming_data = request.get_json(silent=True) or {}
+    ctx = ServiceContext(
+        incoming_data=incoming_data,
+        identity=identity,
+    )
+
+    outcome = run_service(
+        lambda c: update_route_stop_group_position_service(
+            c,
+            incoming_data,
+        ),
+        ctx,
+    )
+    response = Response()
+
+    if outcome.error:
+        return response.build_unsuccessful_response(outcome.error)
+
+    return response.build_successful_response(
+        outcome.data or {},
+        warnings=ctx.warnings,
+    )
+
+
+@route_solution_bp.route(
+    "/stops/<int:route_stop_id>/service-time",
+    methods=["PATCH"],
+)
+@jwt_required()
+@role_required([ADMIN, ASSISTANT, DRIVER])
+def update_route_stop_service_time(route_stop_id: int):
+    identity = get_jwt()
+    incoming_data = request.get_json(silent=True) or {}
+    ctx = ServiceContext(
+        incoming_data=incoming_data,
+        identity=identity,
+    )
+
+    outcome = run_service(
+        lambda c: update_route_stop_service_time_service(
+            c,
+            route_stop_id,
+            incoming_data,
         ),
         ctx,
     )

@@ -53,7 +53,7 @@ class Order(
     client_secondary_phone = Column(JSONB().with_variant(JSON, "sqlite"))  
     client_address = Column(JSONB().with_variant(JSON, "sqlite"))  
 
-
+    operation_type = Column(String, index=True, default="dropoff")
 
     marketing_messages = Column(Boolean, default=False)
 
@@ -166,6 +166,12 @@ class Order(
         "store_pickup",
     }
 
+    ORDER_OPERATION_TYPE = {
+        "pickup",
+        "dropoff",
+        "pickup_dropoff",
+    }
+
     @validates("order_plan_objective")
     def validate_order_plan_intention(self, key, value):
         if value is None:
@@ -175,5 +181,16 @@ class Order(
             raise ValueError(
                 f"Invalid order_plan_objective '{value}'. "
                 f"Allowed values: {self.ORDER_PLAN_INTENTIONS}"
+            )
+        return value
+    
+    @validates("operation_type")
+    def validate_order_operation_type(self, key, value):
+        if value is None:
+            return value
+        if value not in self.ORDER_OPERATION_TYPE:
+            raise ValueError(
+                f"Invalid order operation_type: {value}. "
+                f"Allowed values: {self.ORDER_OPERATION_TYPE}"
             )
         return value

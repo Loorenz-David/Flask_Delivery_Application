@@ -6,6 +6,13 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from Delivery_app_BK.errors import ValidationFailed
 from Delivery_app_BK.models import Order, RouteSolution, RouteSolutionStop
+from Delivery_app_BK.services.domain.local_delivery import (
+    calculate_service_time_seconds,
+    normalize_service_time_payload,
+    parse_duration_seconds,
+    resolve_effective_service_time_payload,
+    resolve_order_item_quantity,
+)
 
 from Delivery_app_BK.directions.domain.models import (
     DirectionsRequest,
@@ -94,7 +101,14 @@ def build_directions_request_bundle(
     if not origin_coordinates or not destination_coordinates:
         raise ValidationFailed("Origin or destination is missing coordinates.")
 
-    intermediates = _build_intermediates(recalculated_stops, orders_by_id)
+    default_service_time = normalize_service_time_payload(
+        route_solution.stops_service_time
+    )
+    intermediates = _build_intermediates(
+        recalculated_stops,
+        orders_by_id,
+        default_service_time=default_service_time,
+    )
     if full_recompute and not intermediates:
         raise ValidationFailed("Route solution has no stops with valid coordinates.")
 
@@ -103,6 +117,7 @@ def build_directions_request_bundle(
         orders_by_id=orders_by_id,
         time_zone=time_zone,
         anchor_stop=anchor_stop,
+        default_service_time=default_service_time,
     )
 
     request = DirectionsRequest(
@@ -187,6 +202,8 @@ def _resolve_destination_location(
 def _build_intermediates(
     stops: list[RouteSolutionStop],
     orders_by_id: Dict[int, Order],
+    *,
+    default_service_time: dict | None,
 ) -> list[DirectionsStopInput]:
     intermediates: list[DirectionsStopInput] = []
     for stop in stops:
@@ -198,7 +215,11 @@ def _build_intermediates(
         coords = _coordinates_from_location(order.client_address)
         if not coords:
             raise ValidationFailed(f"Order {order.id} is missing coordinates.")
-        service_duration_seconds = _parse_duration_seconds(stop.service_duration)
+        service_duration_seconds = _resolve_stop_service_duration_seconds(
+            stop=stop,
+            order=order,
+            default_service_time=default_service_time,
+        )
         intermediates.append(
             DirectionsStopInput(
                 order_id=order.id,
@@ -214,11 +235,21 @@ def _resolve_recompute_departure_time(
     orders_by_id: Dict[int, Order],
     time_zone: str | None,
     anchor_stop: RouteSolutionStop | None,
+    default_service_time: dict | None,
 ) -> Optional[datetime]:
     if anchor_stop and anchor_stop.expected_arrival_time:
         departure_time = _coerce_datetime(anchor_stop.expected_arrival_time)
         if departure_time is not None:
-            service_seconds = _parse_duration_seconds(anchor_stop.service_duration) or 0
+            anchor_order = (
+                orders_by_id.get(anchor_stop.order_id)
+                if anchor_stop.order_id is not None
+                else None
+            )
+            service_seconds = _resolve_stop_service_duration_seconds(
+                stop=anchor_stop,
+                order=anchor_order,
+                default_service_time=default_service_time,
+            ) or 0
             return departure_time + timedelta(seconds=service_seconds)
     return _resolve_departure_time(route_solution, orders_by_id, time_zone=time_zone)
 
@@ -382,54 +413,24 @@ def _parse_time_string(value: Optional[str]) -> Optional[time_cls]:
         return None
 
 
-def _parse_duration_seconds(value: Any) -> Optional[int]:
-    if value is None:
-        return None
-    if isinstance(value, (int, float)):
-        return int(value)
-    parsed = str(value).strip().lower()
-    if not parsed:
-        return None
-
-    suffix_map = {
-        "s": 1,
-        "sec": 1,
-        "secs": 1,
-        "second": 1,
-        "seconds": 1,
-        "m": 60,
-        "min": 60,
-        "mins": 60,
-        "minute": 60,
-        "minutes": 60,
-        "h": 3600,
-        "hr": 3600,
-        "hrs": 3600,
-        "hour": 3600,
-        "hours": 3600,
-    }
-    for suffix, multiplier in suffix_map.items():
-        if parsed.endswith(suffix):
-            numeric = parsed[: -len(suffix)].strip()
-            try:
-                return int(float(numeric) * multiplier)
-            except ValueError:
-                return None
-
-    if ":" in parsed:
-        try:
-            parts = [int(part) for part in parsed.split(":")]
-            while len(parts) < 3:
-                parts.append(0)
-            hours, minutes, seconds = parts[:3]
-            return hours * 3600 + minutes * 60 + seconds
-        except ValueError:
-            return None
-
-    try:
-        return int(float(parsed))
-    except ValueError:
-        return None
+def _resolve_stop_service_duration_seconds(
+    stop: RouteSolutionStop,
+    order: Order | None,
+    *,
+    default_service_time: dict | None,
+) -> int | None:
+    effective_service_time = resolve_effective_service_time_payload(
+        stop.service_time,
+        default_service_time,
+    )
+    item_quantity = resolve_order_item_quantity(order) if order is not None else 0
+    calculated = calculate_service_time_seconds(
+        effective_service_time,
+        item_quantity,
+    )
+    if calculated is not None:
+        return calculated
+    return parse_duration_seconds(stop.service_duration)
 
 
 def _combine_date_time(base: datetime, time_value: Optional[time_cls]) -> Optional[datetime]:

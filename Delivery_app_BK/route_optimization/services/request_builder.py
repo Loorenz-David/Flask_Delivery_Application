@@ -10,6 +10,13 @@ from Delivery_app_BK.route_optimization.domain.models import (
     Shipment,
     TimeWindow,
 )
+from Delivery_app_BK.services.domain.local_delivery import (
+    calculate_service_time_seconds,
+    normalize_service_time_payload,
+    parse_duration_seconds,
+    resolve_effective_service_time_payload,
+    resolve_order_item_quantity,
+)
 from Delivery_app_BK.route_optimization.constants.route_end_strategy import ROUND_TRIP,  LAST_STOP
 
 DEFAULT_ROUTE_MODIFIERS = {
@@ -72,8 +79,6 @@ def build_request(context: OptimizationContext) -> OptimizationRequest:
         context,
         incoming_data,
     )
-    
-    print(global_start_time, ' and end: ', global_end_time)
 
     route_modifiers = dict(DEFAULT_ROUTE_MODIFIERS)
     if isinstance(incoming_data.get("route_modifiers"), dict):
@@ -115,6 +120,14 @@ def build_request(context: OptimizationContext) -> OptimizationRequest:
 
 def _build_shipments(context: OptimizationContext) -> List[Shipment]:
     service_durations = _parse_service_durations(context.incoming_data)
+    stop_by_order_id = {
+        stop.order_id: stop
+        for stop in (context.route_solution.stops or [])
+        if getattr(stop, "order_id", None) is not None
+    }
+    default_service_time = normalize_service_time_payload(
+        context.route_solution.stops_service_time
+    )
     shipments: List[Shipment] = []
 
     for order in context.orders:
@@ -123,13 +136,28 @@ def _build_shipments(context: OptimizationContext) -> List[Shipment]:
             raise ValidationFailed(f"Order {order.id} is missing coordinates.")
        
         time_windows = _build_time_windows(order, context)
+        stop = stop_by_order_id.get(order.id)
+        service_duration_seconds = service_durations.get(order.id)
+        if service_duration_seconds is None:
+            effective_service_time = resolve_effective_service_time_payload(
+                getattr(stop, "service_time", None),
+                default_service_time,
+            )
+            service_duration_seconds = calculate_service_time_seconds(
+                effective_service_time,
+                resolve_order_item_quantity(order),
+            )
+            if service_duration_seconds is None and stop is not None:
+                service_duration_seconds = parse_duration_seconds(
+                    getattr(stop, "service_duration", None),
+                )
        
         shipments.append(
             Shipment(
                 order_id=order.id,
                 location=coords,
                 time_windows=time_windows,
-                service_duration_seconds=service_durations.get(order.id),
+                service_duration_seconds=service_duration_seconds,
             )
         )
 
@@ -137,6 +165,10 @@ def _build_shipments(context: OptimizationContext) -> List[Shipment]:
 
 
 def _build_time_windows(order, context: OptimizationContext) -> List[TimeWindow]:
+    delivery_windows = _build_delivery_windows_from_order(order)
+    if delivery_windows:
+        return delivery_windows
+
     windows: List[TimeWindow] = []
 
     earliest = _coerce_datetime(order.earliest_delivery_date)
@@ -163,6 +195,45 @@ def _build_time_windows(order, context: OptimizationContext) -> List[TimeWindow]
             preferred_end=preferred_end,
             context=context,
         )
+
+    return windows
+
+
+def _build_delivery_windows_from_order(order) -> List[TimeWindow]:
+    rows = list(getattr(order, "delivery_windows", None) or [])
+    if not rows:
+        return []
+
+    if len(rows) > 14:
+        raise ValidationFailed(f"Order {order.id} exceeds max delivery windows (14).")
+
+    sorted_rows = sorted(
+        rows,
+        key=lambda row: (
+            _coerce_datetime(getattr(row, "start_at", None)) or datetime.min.replace(tzinfo=timezone.utc),
+            _coerce_datetime(getattr(row, "end_at", None)) or datetime.min.replace(tzinfo=timezone.utc),
+        ),
+    )
+
+    windows: List[TimeWindow] = []
+    previous_end: Optional[datetime] = None
+    for index, row in enumerate(sorted_rows):
+        start = _coerce_datetime(getattr(row, "start_at", None))
+        end = _coerce_datetime(getattr(row, "end_at", None))
+        if not start or not end:
+            raise ValidationFailed(
+                f"Order {order.id} has invalid delivery window at index {index}.",
+            )
+        if end <= start:
+            raise ValidationFailed(
+                f"Order {order.id} has delivery window with end_at <= start_at at index {index}.",
+            )
+        if previous_end and start < previous_end:
+            raise ValidationFailed(
+                f"Order {order.id} has overlapping delivery windows.",
+            )
+        windows.append(TimeWindow(start_time=start, end_time=end))
+        previous_end = end
 
     return windows
 
@@ -353,60 +424,10 @@ def _parse_service_durations(incoming_data: Dict[str, Any]) -> Dict[int, int]:
             order_id = int(key)
         except (TypeError, ValueError):
             continue
-        seconds = _parse_duration_seconds(value)
+        seconds = parse_duration_seconds(value)
         if seconds is not None:
             durations[order_id] = seconds
     return durations
-
-
-def _parse_duration_seconds(value: Any) -> Optional[int]:
-    if value is None:
-        return None
-    if isinstance(value, (int, float)):
-        return int(value)
-    parsed = str(value).strip().lower()
-    if not parsed:
-        return None
-
-    suffix_map = {
-        "s": 1,
-        "sec": 1,
-        "secs": 1,
-        "second": 1,
-        "seconds": 1,
-        "m": 60,
-        "min": 60,
-        "mins": 60,
-        "minute": 60,
-        "minutes": 60,
-        "h": 3600,
-        "hr": 3600,
-        "hrs": 3600,
-        "hour": 3600,
-        "hours": 3600,
-    }
-    for suffix, multiplier in suffix_map.items():
-        if parsed.endswith(suffix):
-            numeric = parsed[: -len(suffix)].strip()
-            try:
-                return int(float(numeric) * multiplier)
-            except ValueError:
-                return None
-
-    if ":" in parsed:
-        try:
-            parts = [int(part) for part in parsed.split(":")]
-            while len(parts) < 3:
-                parts.append(0)
-            hours, minutes, seconds = parts[:3]
-            return hours * 3600 + minutes * 60 + seconds
-        except ValueError:
-            return None
-
-    try:
-        return int(float(parsed))
-    except ValueError:
-        return None
 
 
 def _parse_time_string(value: Optional[str]) -> Optional[time_cls]:

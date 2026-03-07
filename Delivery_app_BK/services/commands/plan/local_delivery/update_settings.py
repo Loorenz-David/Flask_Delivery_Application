@@ -100,6 +100,8 @@ def _build_route_solution_updates(route_patch: RouteSolutionPatchRequest) -> dic
         updates["route_end_strategy"] = route_patch.route_end_strategy
     if route_patch.has_driver_id:
         updates["driver_id"] = route_patch.driver_id
+    if route_patch.has_stops_service_time:
+        updates["stops_service_time"] = route_patch.stops_service_time
 
     return updates
 
@@ -126,5 +128,6 @@ def _has_route_solution_patch(route_patch: RouteSolutionPatchRequest) -> bool:
             route_patch.has_set_end_time,
             route_patch.has_route_end_strategy,
             route_patch.has_driver_id,
+            route_patch.has_stops_service_time,
         ]
     )

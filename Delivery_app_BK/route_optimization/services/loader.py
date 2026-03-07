@@ -1,7 +1,8 @@
 from __future__ import annotations
 from datetime import datetime, timezone
 from Delivery_app_BK.errors import ValidationFailed, NotFound
-from Delivery_app_BK.models import LocalDeliveryPlan, RouteSolution, DeliveryPlan
+from sqlalchemy.orm import selectinload
+from Delivery_app_BK.models import LocalDeliveryPlan, RouteSolution, DeliveryPlan, Order, db
 from Delivery_app_BK.route_optimization.domain.models import OptimizationContext
 from Delivery_app_BK.services.queries.get_instance import get_instance
 from Delivery_app_BK.services.context import ServiceContext
@@ -31,7 +32,12 @@ def load_optimization_context(ctx:ServiceContext) -> OptimizationContext:
 
     route_solution = _select_route_solution(local_delivery_plan)
 
-    orders = list(delivery_plan.orders or [])
+    orders = (
+        db.session.query(Order)
+        .options(selectinload(Order.delivery_windows), selectinload(Order.items))
+        .filter(Order.delivery_plan_id == delivery_plan.id)
+        .all()
+    )
     if not orders:
         raise ValidationFailed("Delivery plan has no orders to optimize.")
 

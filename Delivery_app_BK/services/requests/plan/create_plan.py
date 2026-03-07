@@ -27,6 +27,7 @@ ALLOWED_CREATE_FIELDS = {
     "start_date",
     "end_date",
     "order_ids",
+    "plan_type_defaults",
 }
 
 LEGACY_REJECTED_FIELDS = {
@@ -51,6 +52,15 @@ class PlanCreateRequest:
     start_date: datetime
     end_date: datetime
     order_ids: list[int]
+    plan_type_defaults: dict
+
+
+def _normalize_plan_type_defaults(raw_defaults: object) -> dict:
+    if raw_defaults is None:
+        return {}
+    if not isinstance(raw_defaults, dict):
+        raise ValidationFailed("plan_type_defaults must be an object.")
+    return raw_defaults
 
 
 def parse_create_plan_request(raw_fields: dict) -> PlanCreateRequest:
@@ -94,6 +104,9 @@ def parse_create_plan_request(raw_fields: dict) -> PlanCreateRequest:
         raise ValidationFailed("end_date cannot be before start_date.")
 
     order_ids = validate_int_list(raw_fields.get("order_ids"), field="order_ids")
+    plan_type_defaults = _normalize_plan_type_defaults(
+        raw_fields.get("plan_type_defaults")
+    )
 
     return PlanCreateRequest(
         client_id=client_id,
@@ -102,4 +115,5 @@ def parse_create_plan_request(raw_fields: dict) -> PlanCreateRequest:
         start_date=start_date,
         end_date=end_date,
         order_ids=order_ids,
+        plan_type_defaults=plan_type_defaults,
     )

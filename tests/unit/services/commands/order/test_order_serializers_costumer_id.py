@@ -1,3 +1,4 @@
+from datetime import datetime
 from types import SimpleNamespace
 
 import Delivery_app_BK.services.commands.order.create_serializers as create_module
@@ -31,6 +32,22 @@ def _build_order_instance():
         delivery_plan_id=None,
         archive_at=None,
         order_cases=[],
+        delivery_windows=[
+            SimpleNamespace(
+                id=2,
+                client_id="dw_2",
+                start_at=datetime.fromisoformat("2026-03-05T12:00:00+00:00"),
+                end_at=datetime.fromisoformat("2026-03-05T14:00:00+00:00"),
+                window_type="FULL_RANGE",
+            ),
+            SimpleNamespace(
+                id=1,
+                client_id="dw_1",
+                start_at=datetime.fromisoformat("2026-03-05T09:00:00+00:00"),
+                end_at=datetime.fromisoformat("2026-03-05T11:00:00+00:00"),
+                window_type="FULL_RANGE",
+            ),
+        ],
     )
 
 
@@ -49,3 +66,16 @@ def test_serialize_orders_includes_costumer_id(monkeypatch):
     serialized = list_module.serialize_orders([_build_order_instance()], SimpleNamespace())
 
     assert serialized[0]["costumer_id"] == 77
+
+
+def test_serializers_include_sorted_delivery_windows(monkeypatch):
+    monkeypatch.setattr(create_module, "calculate_order_metrics", lambda _order: {})
+    monkeypatch.setattr(list_module, "calculate_order_metrics", lambda _order: {})
+    monkeypatch.setattr(list_module, "map_return_values", lambda values, _ctx, _key: values)
+
+    created = create_module.serialize_created_order(_build_order_instance())
+    listed = list_module.serialize_orders([_build_order_instance()], SimpleNamespace())
+
+    assert created["delivery_windows"][0]["client_id"] == "dw_1"
+    assert created["delivery_windows"][1]["client_id"] == "dw_2"
+    assert listed[0]["delivery_windows"][0]["client_id"] == "dw_1"

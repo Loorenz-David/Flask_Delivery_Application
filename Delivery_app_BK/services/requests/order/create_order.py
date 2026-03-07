@@ -40,9 +40,11 @@ ORDER_ALLOWED_FIELDS = {
     "latest_delivery_date",
     "preferred_time_start",
     "preferred_time_end",
+    "delivery_windows",
     "order_state_id",
     "delivery_plan_id",
     "items",
+    "operation_type",
 }
 
 ORDER_FORBIDDEN_FIELDS = {
@@ -80,6 +82,7 @@ ITEM_FORBIDDEN_FIELDS = {
 
 ORDER_OPTIONAL_STRING_FIELDS = {
     "order_plan_objective",
+    "operation_type",
     "reference_number",
     "external_order_id",
     "external_source",
@@ -112,6 +115,12 @@ ORDER_OBJECTIVES = {
     "local_delivery",
     "international_shipping",
     "store_pickup",
+}
+
+ORDER_OPERATION_TYPES ={
+        "pickup",
+        "dropoff",
+        "pickup_dropoff",
 }
 
 COSTUMER_ALLOWED_FIELDS = {
@@ -147,6 +156,7 @@ class OrderCreateRequest:
     items: list[ItemCreateRequest]
     delivery_plan_id: int | None
     costumer: OrderCostumerRequest | None
+    delivery_windows: list[dict] | None = None
 
 
 def parse_create_order_request(raw_fields: dict) -> OrderCreateRequest:
@@ -185,6 +195,12 @@ def parse_create_order_request(raw_fields: dict) -> OrderCreateRequest:
                     raise ValidationFailed(
                         f"Invalid order_plan_objective: {parsed_value}"
                     )
+            elif field == "operation_type" and parsed_value:
+                if parsed_value not in ORDER_OPERATION_TYPES:
+                    raise ValidationFailed(
+                        f"Invalid order_operation type: {parsed_value}"
+                    )
+                
             order_fields[field] = parsed_value
 
     if "client_primary_phone" in raw_fields:
@@ -235,11 +251,13 @@ def parse_create_order_request(raw_fields: dict) -> OrderCreateRequest:
             )
 
     item_requests = _parse_items(raw_fields)
+    delivery_windows = _parse_delivery_windows(raw_fields)
     return OrderCreateRequest(
         fields=order_fields,
         items=item_requests,
         delivery_plan_id=delivery_plan_id,
         costumer=costumer,
+        delivery_windows=delivery_windows,
     )
 
 
@@ -252,6 +270,48 @@ def _parse_items(raw_fields: dict) -> list[ItemCreateRequest]:
         raise ValidationFailed("items must be a list of objects.")
 
     return [_parse_item(item_raw, index) for index, item_raw in enumerate(items_payload)]
+
+
+def _parse_delivery_windows(raw_fields: dict) -> list[dict] | None:
+    if "delivery_windows" not in raw_fields:
+        return None
+
+    payload = raw_fields.get("delivery_windows")
+    if payload is None:
+        return []
+    if not isinstance(payload, list):
+        raise ValidationFailed("delivery_windows must be a list of objects.")
+
+    parsed_rows: list[dict] = []
+    for index, row in enumerate(payload):
+        if not isinstance(row, dict):
+            raise ValidationFailed(f"delivery_windows[{index}] must be an object.")
+
+        if "start_at" not in row:
+            raise ValidationFailed(f"delivery_windows[{index}].start_at is required.")
+        if "end_at" not in row:
+            raise ValidationFailed(f"delivery_windows[{index}].end_at is required.")
+        if "window_type" not in row:
+            raise ValidationFailed(f"delivery_windows[{index}].window_type is required.")
+
+        parsed_rows.append(
+            {
+                "client_id": parse_optional_string(
+                    row.get("client_id"),
+                    field=f"delivery_windows[{index}].client_id",
+                )
+                if "client_id" in row
+                else None,
+                "start_at": row.get("start_at"),
+                "end_at": row.get("end_at"),
+                "window_type": parse_optional_string(
+                    row.get("window_type"),
+                    field=f"delivery_windows[{index}].window_type",
+                ),
+            }
+        )
+
+    return parsed_rows
 
 
 def _parse_item(item_raw, index: int) -> ItemCreateRequest:

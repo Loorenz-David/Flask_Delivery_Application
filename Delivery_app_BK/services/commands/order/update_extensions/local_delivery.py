@@ -2,16 +2,12 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from Delivery_app_BK.directions.services.warnings import build_stop_time_warnings
-from Delivery_app_BK.models import RouteSolution, RouteSolutionStop
-from Delivery_app_BK.route_optimization.constants.skip_reasons import (
-    OUTSIDE_TIME_WINDOW,
+from Delivery_app_BK.directions.services.time_window_policy import (
+    apply_stop_time_window_evaluation,
 )
+from Delivery_app_BK.models import RouteSolution, RouteSolutionStop
 from Delivery_app_BK.services.commands.plan.local_delivery.route_solution.plan_sync import (
     build_incremental_route_sync_action,
-)
-from Delivery_app_BK.services.commands.plan.local_delivery.route_solution.plan_sync.normalizers import (
-    normalize_skip_reason,
 )
 
 from ....context import ServiceContext
@@ -155,18 +151,12 @@ def _apply_window_warning_updates(
             stop.constraint_warnings,
             stop.reason_was_skipped,
         )
-        warnings = build_stop_time_warnings(
-            order_instance,
-            stop.expected_arrival_time,
-            route_solution,
+        apply_stop_time_window_evaluation(
+            stop=stop,
+            order=order_instance,
+            route_solution=route_solution,
+            arrival_time=stop.expected_arrival_time,
         )
-
-        if warnings:
-            stop.constraint_warnings = warnings
-            stop.has_constraint_violation = True
-            stop.reason_was_skipped = normalize_skip_reason(OUTSIDE_TIME_WINDOW)
-        else:
-            _clear_time_window_warning(stop)
 
         current_state = (
             stop.has_constraint_violation,
@@ -177,24 +167,6 @@ def _apply_window_warning_updates(
             changed.append(stop)
 
     return changed
-
-
-def _clear_time_window_warning(stop: RouteSolutionStop) -> None:
-    existing = list(stop.constraint_warnings or [])
-    filtered = [
-        warning
-        for warning in existing
-        if warning.get("type") != "time_window_violation"
-    ]
-    if filtered:
-        stop.constraint_warnings = filtered
-        stop.has_constraint_violation = True
-    else:
-        stop.constraint_warnings = None
-        stop.has_constraint_violation = False
-
-    if stop.reason_was_skipped == normalize_skip_reason(OUTSIDE_TIME_WINDOW):
-        stop.reason_was_skipped = None
 
 
 def _dedupe_routes(route_solutions: list[RouteSolution]) -> list[RouteSolution]:

@@ -13,8 +13,10 @@ from Delivery_app_BK.services.commands.costumer.update_costumer import (
     update_costumer as update_costumer_service,
 )
 from Delivery_app_BK.services.context import ServiceContext
-from Delivery_app_BK.services.queries.costumer.list_costumers import (
+from Delivery_app_BK.services.queries.costumer import (
     list_costumers as list_costumers_service,
+    get_costumer as get_costumer_service,
+    list_costumer_orders as list_costumer_orders_service,
 )
 from Delivery_app_BK.services.run_service import run_service
 
@@ -32,6 +34,45 @@ def list_costumers():
         identity=identity,
     )
     outcome = run_service(lambda c: list_costumers_service(c), ctx)
+    response = Response()
+
+    if outcome.error:
+        return response.build_unsuccessful_response(outcome.error)
+    return response.build_successful_response(
+        outcome.data,
+        warnings=ctx.warnings,
+    )
+
+@costumer_bp.route("/<int:costumer_id>", methods=["GET"])
+@jwt_required()
+@role_required([ADMIN, ASSISTANT, DRIVER])
+def get_costumer(costumer_id):
+    identity = get_jwt()
+    ctx = ServiceContext(
+        query_params=request.args.to_dict(),
+        identity=identity,
+    )
+    outcome = run_service(lambda c: get_costumer_service( costumer_id, c ), ctx)
+    response = Response()
+
+    if outcome.error:
+        return response.build_unsuccessful_response(outcome.error)
+    return response.build_successful_response(
+        outcome.data,
+        warnings=ctx.warnings,
+    )
+
+
+@costumer_bp.route("/<int:costumer_id>/orders", methods=["GET"])
+@jwt_required()
+@role_required([ADMIN, ASSISTANT, DRIVER])
+def list_costumer_orders(costumer_id):
+    identity = get_jwt()
+    ctx = ServiceContext(
+        query_params=request.args.to_dict(),
+        identity=identity,
+    )
+    outcome = run_service(lambda c: list_costumer_orders_service(costumer_id, c), ctx)
     response = Response()
 
     if outcome.error:
@@ -103,4 +144,3 @@ def delete_costumer():
         outcome.data or {},
         warnings=ctx.warnings,
     )
-

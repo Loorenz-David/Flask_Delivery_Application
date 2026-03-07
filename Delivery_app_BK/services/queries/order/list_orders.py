@@ -1,4 +1,5 @@
 from Delivery_app_BK.models import db, Order
+from sqlalchemy.orm import selectinload
 
 from ..utils import build_pagination
 from ...context import ServiceContext
@@ -9,7 +10,7 @@ from .order_stats import order_stats
 
 
 def list_orders(ctx: ServiceContext, plan_id: int | None = None):
-    base_query = db.session.query(Order)
+    base_query = db.session.query(Order).options(selectinload(Order.delivery_windows))
     if plan_id is not None:
         base_query = base_query.filter(Order.delivery_plan_id == plan_id)
 

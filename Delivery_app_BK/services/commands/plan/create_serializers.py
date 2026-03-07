@@ -93,6 +93,7 @@ def serialize_created_route_solution(instance: RouteSolution) -> dict:
         "expected_end_time": _to_iso(instance.expected_end_time),
         "set_start_time": instance.set_start_time,
         "set_end_time": instance.set_end_time,
+        "stops_service_time": instance.stops_service_time,
         "is_selected": instance.is_selected,
         "is_optimized": instance.is_optimized,
         "driver_id": instance.driver_id,

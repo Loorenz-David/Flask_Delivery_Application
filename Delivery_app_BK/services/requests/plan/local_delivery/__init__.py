@@ -5,6 +5,14 @@ from .update_settings import (
     RouteSolutionPatchRequest,
     parse_update_local_delivery_settings_request,
 )
+from .update_route_stop_group_position import (
+    RouteStopGroupPositionRequest,
+    parse_update_route_stop_group_position_request,
+)
+from .update_route_stop_service_time import (
+    RouteStopServiceTimeRequest,
+    parse_update_route_stop_service_time_request,
+)
 
 __all__ = [
     "DeliveryPlanPatchRequest",
@@ -12,4 +20,8 @@ __all__ = [
     "LocalDeliverySettingsRequest",
     "RouteSolutionPatchRequest",
     "parse_update_local_delivery_settings_request",
+    "RouteStopGroupPositionRequest",
+    "parse_update_route_stop_group_position_request",
+    "RouteStopServiceTimeRequest",
+    "parse_update_route_stop_service_time_request",
 ]

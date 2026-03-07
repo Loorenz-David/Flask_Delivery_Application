@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, time as time_cls, timezone
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 from Delivery_app_BK.models import Order, RouteSolution, RouteSolutionStop
 from Delivery_app_BK.models.mixins.validation_mixins.time_warning_validation import (
@@ -15,7 +15,8 @@ from Delivery_app_BK.directions.domain.models import (
 from Delivery_app_BK.directions.services.request_builder import (
     _parse_time_string,
 )
-from Delivery_app_BK.directions.services.warnings import (
+from Delivery_app_BK.directions.services.time_window_policy import (
+    apply_stop_time_window_evaluation,
     build_stop_time_warnings,
     ensure_utc,
 )
@@ -81,13 +82,12 @@ def apply_directions_result(
         stop.reason_was_skipped = None
 
         order_instance = orders_by_id.get(stop.order_id) or getattr(stop, "order", None)
-        warnings = build_stop_time_warnings(
-            order_instance,
-            stop.expected_arrival_time,
-            route_solution,
+        apply_stop_time_window_evaluation(
+            stop=stop,
+            order=order_instance,
+            route_solution=route_solution,
+            arrival_time=stop.expected_arrival_time,
         )
-        stop.constraint_warnings = warnings or None
-        stop.has_constraint_violation = bool(warnings)
         changed_stops.append(stop)
 
     changed_stops.extend(
@@ -210,3 +210,11 @@ def _resolve_allowed_end(route_solution: RouteSolution) -> Optional[datetime]:
         time_cls(23, 59, 59),
         tzinfo=end_date.tzinfo,
     )
+
+
+def _build_stop_warnings(
+    order: Optional[Order],
+    arrival_time: Optional[datetime],
+    route_solution: RouteSolution,
+) -> List[dict]:
+    return build_stop_time_warnings(order, arrival_time, route_solution)

@@ -1,7 +1,7 @@
 # Third-party dependecies
 
 from sqlalchemy.orm import relationship
-from sqlalchemy import Column, Integer,  ForeignKey, String, Boolean, Enum
+from sqlalchemy import Column, Integer,  ForeignKey, String, Boolean, Enum, JSON
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime, timezone
 
@@ -9,11 +9,14 @@ from datetime import datetime, timezone
 
 from Delivery_app_BK.models import db
 from Delivery_app_BK.models.mixins.team_mixings.team_id import TeamScopedMixin
+from Delivery_app_BK.models.mixins.validation_mixins.service_time_validation import (
+    ServiceTimeJSONValidationMixin,
+)
 from Delivery_app_BK.models.utils import UTCDateTime
 
 
 
-class RouteSolutionStop(db.Model, TeamScopedMixin):
+class RouteSolutionStop(db.Model, TeamScopedMixin, ServiceTimeJSONValidationMixin):
     __tablename__ = "route_solution_stop"
 
     id = Column(Integer, primary_key=True)
@@ -30,7 +33,9 @@ class RouteSolutionStop(db.Model, TeamScopedMixin):
         ForeignKey("order.id", ondelete="CASCADE")
     )
 
+    # legacy free-form duration kept for backwards compatibility
     service_duration = Column(String) # sec
+    service_time = Column(JSONB().with_variant(JSON, "sqlite"), nullable=True)
     
     
 

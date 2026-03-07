@@ -1,5 +1,8 @@
 from Delivery_app_BK.models import Item, Order, RouteSolutionStop
 from Delivery_app_BK.services.domain.order.order_case_states import OrderCaseState
+from Delivery_app_BK.services.domain.order.delivery_windows import (
+    sort_delivery_window_instances,
+)
 from Delivery_app_BK.services.queries.utils import calculate_order_metrics
 
 
@@ -9,11 +12,15 @@ def serialize_created_order(instance: Order) -> dict:
     latest_delivery_date = instance.latest_delivery_date
     archive_at = instance.archive_at
     metrics = calculate_order_metrics(instance)
+    delivery_windows = sort_delivery_window_instances(
+        list(getattr(instance, "delivery_windows", None) or []),
+    )
 
     return {
         "id": instance.id,
         "client_id": instance.client_id,
         "order_plan_objective": instance.order_plan_objective,
+        "operation_type": instance.operation_type,
         "reference_number": instance.reference_number,
         "external_order_id": instance.external_order_id,
         "external_source": instance.external_source,
@@ -38,6 +45,16 @@ def serialize_created_order(instance: Order) -> dict:
         "order_state_id": instance.order_state_id,
         "delivery_plan_id": instance.delivery_plan_id,
         "costumer_id": instance.costumer_id,
+        "delivery_windows": [
+            {
+                "id": row.id,
+                "client_id": row.client_id,
+                "start_at": row.start_at.isoformat() if row.start_at else None,
+                "end_at": row.end_at.isoformat() if row.end_at else None,
+                "window_type": row.window_type,
+            }
+            for row in delivery_windows
+        ],
         "open_order_cases": _count_open_order_cases(instance),
         "archive_at": archive_at.isoformat() if archive_at else None,
         **metrics,
@@ -75,6 +92,7 @@ def serialize_created_order_stops(instances: list[RouteSolutionStop]) -> list[di
             "route_solution_id": instance.route_solution_id,
             "order_id": instance.order_id,
             "service_duration": instance.service_duration,
+            "service_time": instance.service_time,
             "in_range": instance.in_range,
             "stop_order": instance.stop_order,
             "reason_was_skipped": instance.reason_was_skipped,

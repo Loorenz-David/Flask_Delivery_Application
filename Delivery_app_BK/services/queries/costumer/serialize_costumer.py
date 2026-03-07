@@ -40,11 +40,11 @@ def serialize_costumer(instance: Costumer, include_order_count: bool = False) ->
     }
 
     if include_order_count:
-        order_count = getattr(instance, "order_count", None)
-        if order_count is None:
+        active_order_count = getattr(instance, "active_order_count", None)
+        if active_order_count is None:
             orders = getattr(instance, "orders", None) or []
-            order_count = len(orders)
-        serialized["order_count"] = int(order_count)
+            active_order_count = sum(1 for order in orders if getattr(order, "archive_at", None) is None)
+        serialized["active_order_count"] = int(active_order_count)
 
     return serialized
 

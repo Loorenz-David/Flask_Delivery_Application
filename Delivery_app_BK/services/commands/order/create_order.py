@@ -14,6 +14,7 @@ from Delivery_app_BK.models import (
     ItemPosition,
     ItemState,
     Order,
+    OrderDeliveryWindow,
     OrderState,
     Team,
 )
@@ -29,6 +30,12 @@ from .create_serializers import (
 )
 from Delivery_app_BK.services.infra.events.emiters.order import emit_order_events
 from .plan_objectives import PlanObjectiveCreateResult, apply_order_plan_objective
+from ...domain.order.delivery_windows import (
+    derive_legacy_delivery_envelope_fields,
+    resolve_order_delivery_windows_timezone,
+    validate_and_normalize_delivery_windows,
+    validate_same_local_day_delivery_windows,
+)
 
 
 def create_order(ctx: ServiceContext):
@@ -49,6 +56,7 @@ def create_order(ctx: ServiceContext):
     pending_events: list[dict] = []
     created_bundles: list[dict] = []
     def _apply() -> None:
+        team_timezone = resolve_order_delivery_windows_timezone(ctx)
         resolved_costumers = resolve_or_create_costumers(
             ctx,
             [
@@ -103,6 +111,21 @@ def create_order(ctx: ServiceContext):
 
         for order_request, resolved_costumer in zip(order_requests, resolved_costumers):
             order_fields = dict(order_request.fields)
+            normalized_windows = None
+            if order_request.delivery_windows is not None:
+                normalized_windows = validate_and_normalize_delivery_windows(
+                    order_request.delivery_windows,
+                )
+                validate_same_local_day_delivery_windows(
+                    normalized_windows,
+                    team_timezone=team_timezone,
+                )
+                order_fields.update(
+                    derive_legacy_delivery_envelope_fields(
+                        normalized_windows,
+                        team_timezone=team_timezone,
+                    )
+                )
             delivery_plan = (
                 delivery_plans_by_id.get(order_request.delivery_plan_id)
                 if order_request.delivery_plan_id is not None
@@ -122,6 +145,18 @@ def create_order(ctx: ServiceContext):
             if resolved_delivery_plan_id is not None:
                 order_instance.delivery_plan_id = resolved_delivery_plan_id
             order_instances.append(order_instance)
+
+            if normalized_windows is not None:
+                for window in normalized_windows:
+                    order_instance.delivery_windows.append(
+                        OrderDeliveryWindow(
+                            team_id=ctx.team_id,
+                            client_id=window.client_id,
+                            start_at=window.start_at,
+                            end_at=window.end_at,
+                            window_type=window.window_type,
+                        )
+                    )
             
             for item_request in order_request.items:
                 item_instance: Item = create_instance(ctx, Item, dict(item_request.fields))
