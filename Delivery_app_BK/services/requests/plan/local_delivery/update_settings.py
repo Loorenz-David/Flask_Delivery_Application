@@ -12,6 +12,9 @@ from Delivery_app_BK.services.requests.common.types import (
     parse_optional_time_zone,
     validate_str,
 )
+from Delivery_app_BK.services.domain.local_delivery import (
+    normalize_service_time_payload,
+)
 
 
 ALLOWED_TOP_LEVEL_FIELDS = {
@@ -53,12 +56,14 @@ class RouteSolutionPatchRequest:
     set_end_time: str | None = None
     route_end_strategy: str | None = None
     driver_id: int | None = None
+    stops_service_time: dict | None = None
     has_start_location: bool = False
     has_end_location: bool = False
     has_set_start_time: bool = False
     has_set_end_time: bool = False
     has_route_end_strategy: bool = False
     has_driver_id: bool = False
+    has_stops_service_time: bool = False
 
 
 @dataclass
@@ -238,6 +243,14 @@ def _parse_route_solution_patch(
         patch.driver_id = _validate_nullable_int(
             route_solution_raw.get("driver_id"),
             field="route_solution.driver_id",
+        )
+
+    if "stops_service_time" in route_solution_raw:
+        patch.has_stops_service_time = True
+        patch.stops_service_time = normalize_service_time_payload(
+            route_solution_raw.get("stops_service_time"),
+            field="route_solution.stops_service_time",
+            strict=True,
         )
 
     return patch

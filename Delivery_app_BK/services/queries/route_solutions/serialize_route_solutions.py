@@ -30,6 +30,7 @@ def serialize_route_solution(instance: RouteSolution) -> dict:
         "expected_end_time": expected_end_time.isoformat() if expected_end_time else None,
         "set_start_time": instance.set_start_time,
         "set_end_time": instance.set_end_time,
+        "stops_service_time": instance.stops_service_time,
         "is_selected": instance.is_selected,
         "is_optimized": instance.is_optimized,
         "driver_id": instance.driver_id,

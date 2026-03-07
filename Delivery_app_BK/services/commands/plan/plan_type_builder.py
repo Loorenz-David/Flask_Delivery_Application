@@ -21,6 +21,7 @@ from Delivery_app_BK.route_optimization.constants.route_end_strategy import (
     ROUND_TRIP,
 )
 from Delivery_app_BK.services.commands.utils import generate_client_id
+from Delivery_app_BK.services.domain.local_delivery import normalize_service_time_payload
 
 from ...context import ServiceContext
 from ..base.create_instance import create_instance
@@ -74,6 +75,7 @@ def _build_local_delivery_plan_type(
         set_start_time=route_solution_defaults["set_start_time"],
         expected_start_time=route_solution_defaults["expected_start_time"],
         set_end_time=route_solution_defaults["set_end_time"],
+        stops_service_time=route_solution_defaults["stops_service_time"],
         route_end_strategy=route_solution_defaults["route_end_strategy"],
         driver_id=route_solution_defaults["driver_id"],
     )
@@ -170,6 +172,9 @@ def _normalize_local_delivery_route_solution_defaults(
 
     raw_driver_id = route_solution_defaults.get("driver_id")
     driver_id = raw_driver_id if isinstance(raw_driver_id, int) and not isinstance(raw_driver_id, bool) else None
+    stops_service_time = normalize_service_time_payload(
+        route_solution_defaults.get("stops_service_time")
+    )
 
     return {
         "start_location": start_location,
@@ -177,6 +182,7 @@ def _normalize_local_delivery_route_solution_defaults(
         "set_start_time": set_start_time,
         "expected_start_time": expected_start_time,
         "set_end_time": set_end_time,
+        "stops_service_time": stops_service_time,
         "route_end_strategy": route_end_strategy,
         "driver_id": driver_id,
     }

@@ -34,7 +34,7 @@ def load_optimization_context(ctx:ServiceContext) -> OptimizationContext:
 
     orders = (
         db.session.query(Order)
-        .options(selectinload(Order.delivery_windows))
+        .options(selectinload(Order.delivery_windows), selectinload(Order.items))
         .filter(Order.delivery_plan_id == delivery_plan.id)
         .all()
     )

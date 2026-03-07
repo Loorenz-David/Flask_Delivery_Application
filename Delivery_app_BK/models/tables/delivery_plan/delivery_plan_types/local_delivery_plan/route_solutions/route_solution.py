@@ -8,6 +8,9 @@ from datetime import datetime, timezone
 
 # Local application imports
 from Delivery_app_BK.models.mixins.validation_mixins.address_validation import AddressJSONValidationMixin
+from Delivery_app_BK.models.mixins.validation_mixins.service_time_validation import (
+    ServiceTimeJSONValidationMixin,
+)
 
 from Delivery_app_BK.models import db
 from Delivery_app_BK.models.mixins.team_mixings.team_id import TeamScopedMixin
@@ -20,7 +23,12 @@ from Delivery_app_BK.route_optimization.constants.route_end_strategy import ROUN
 
 
 
-class RouteSolution(db.Model, TeamScopedMixin, AddressJSONValidationMixin):
+class RouteSolution(
+    db.Model,
+    TeamScopedMixin,
+    AddressJSONValidationMixin,
+    ServiceTimeJSONValidationMixin,
+):
     __tablename__ = "route_solution"
 
 
@@ -63,6 +71,7 @@ class RouteSolution(db.Model, TeamScopedMixin, AddressJSONValidationMixin):
     # and they infer a repeated allowed time accross the delivery plan date range
     set_start_time = Column( String )
     set_end_time = Column( String )
+    stops_service_time = Column(JSONB().with_variant(JSON, "sqlite"), nullable=True)
 
     created_at = Column(
         UTCDateTime,

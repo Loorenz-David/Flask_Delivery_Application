@@ -18,6 +18,7 @@ def serialize_route_solution_stops(instances: List[RouteSolutionStop], ctx: Serv
                 "route_solution_id": instance.route_solution_id,
                 "order_id": instance.order_id,
                 "service_duration": instance.service_duration,
+                "service_time": instance.service_time,
                 "in_range": instance.in_range,
                 "stop_order": instance.stop_order,
                 "reason_was_skipped": instance.reason_was_skipped,

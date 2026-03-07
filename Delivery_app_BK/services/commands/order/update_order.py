@@ -54,6 +54,7 @@ FORBIDDEN_RELATIONSHIP_KEYS = {
 
 MUTABLE_FIELDS = {
     "order_plan_objective",
+    "operation_type",
     "reference_number",
     "external_order_id",
     "external_source",

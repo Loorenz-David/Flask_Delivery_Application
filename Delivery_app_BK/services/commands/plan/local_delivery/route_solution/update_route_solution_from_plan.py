@@ -46,7 +46,7 @@ def update_route_solution_from_plan(
     old_set_start_time = route_solution.set_start_time
     old_set_end_time = route_solution.set_end_time
 
-    has_address_change, has_time_change = apply_route_solution_field_updates(
+    has_address_change, has_time_change, has_service_time_change = apply_route_solution_field_updates(
         route_solution=route_solution,
         updates=updates,
     )
@@ -68,7 +68,7 @@ def update_route_solution_from_plan(
     window_changed = old_window != new_window
     stops_changed = original_route_solution is not None
 
-    if has_address_change:
+    if has_address_change or has_service_time_change:
         if route_solution.is_optimized != IS_OPTIMIZED_NOT_OPTIMIZED:
             route_solution.is_optimized = IS_OPTIMIZED_PARTIAL
             refresh_route_solution(

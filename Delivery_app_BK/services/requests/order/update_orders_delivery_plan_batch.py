@@ -42,6 +42,7 @@ ALLOWED_SNAPSHOT_FILTERS = {
     "schedule_order",
     "unschedule_order",
     "earliest_delivery_date",
+    "operation_type",
     "latest_delivery_date",
     "creation_date_from",
     "creation_date_to",

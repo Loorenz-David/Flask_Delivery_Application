@@ -44,6 +44,7 @@ ORDER_ALLOWED_FIELDS = {
     "order_state_id",
     "delivery_plan_id",
     "items",
+    "operation_type",
 }
 
 ORDER_FORBIDDEN_FIELDS = {
@@ -81,6 +82,7 @@ ITEM_FORBIDDEN_FIELDS = {
 
 ORDER_OPTIONAL_STRING_FIELDS = {
     "order_plan_objective",
+    "operation_type",
     "reference_number",
     "external_order_id",
     "external_source",
@@ -113,6 +115,12 @@ ORDER_OBJECTIVES = {
     "local_delivery",
     "international_shipping",
     "store_pickup",
+}
+
+ORDER_OPERATION_TYPES ={
+        "pickup",
+        "dropoff",
+        "pickup_dropoff",
 }
 
 COSTUMER_ALLOWED_FIELDS = {
@@ -187,6 +195,12 @@ def parse_create_order_request(raw_fields: dict) -> OrderCreateRequest:
                     raise ValidationFailed(
                         f"Invalid order_plan_objective: {parsed_value}"
                     )
+            elif field == "operation_type" and parsed_value:
+                if parsed_value not in ORDER_OPERATION_TYPES:
+                    raise ValidationFailed(
+                        f"Invalid order_operation type: {parsed_value}"
+                    )
+                
             order_fields[field] = parsed_value
 
     if "client_primary_phone" in raw_fields:

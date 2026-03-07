@@ -29,6 +29,7 @@ def serialize_orders( instances: List[ Order ], ctx:ServiceContext  ):
             "id": instance.id,
             "client_id": instance.client_id,
             "order_plan_objective": instance.order_plan_objective,
+            "operation_type": instance.operation_type,
             "reference_number": instance.reference_number,
             "external_order_id": instance.external_order_id,
             "external_source": instance.external_source,
