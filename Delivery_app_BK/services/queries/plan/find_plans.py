@@ -8,7 +8,7 @@ from ...context import ServiceContext
 from ...utils import to_datetime
 
 from ..order.find_orders import find_orders
-from ..utils import apply_pagination_by_date
+from ..utils import apply_opaque_pagination_by_date
 
 """
  for adding a filter use:
@@ -70,12 +70,12 @@ def find_plans( params:Dict, ctx:ServiceContext ):
 
     if params.get("sort") == 'date_asc':
         query = query.order_by( 
-            DeliveryPlan.start_date.asc(),
+            DeliveryPlan.created_at.asc(),
             DeliveryPlan.id.asc()
         )
     else:
         query = query.order_by( 
-            DeliveryPlan.start_date.desc(),
+            DeliveryPlan.created_at.desc(),
             DeliveryPlan.id.desc()
         )
 
@@ -84,9 +84,9 @@ def find_plans( params:Dict, ctx:ServiceContext ):
 
     # pagination -------------------------
 
-    query = apply_pagination_by_date(
+    query = apply_opaque_pagination_by_date(
         query = query,
-        date_column = DeliveryPlan.start_date,
+        date_column = DeliveryPlan.created_at,
         id_column = DeliveryPlan.id,
         params = params,
         sort = params.get( "sort", 'date_desc')
@@ -94,4 +94,4 @@ def find_plans( params:Dict, ctx:ServiceContext ):
 
     #----------------------------------------------------
     
-    return query
+    return query.distinct()

@@ -1,7 +1,7 @@
 # Third-party dependecies
 
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy import Index, text, JSON
+from sqlalchemy import Index, text, JSON, UniqueConstraint
 from sqlalchemy.orm import relationship, validates
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
 
@@ -38,6 +38,7 @@ class Order(
     """
     order_plan_objective= Column(String, index=True)
 
+    order_scalar_id = Column(Integer, index=True)
     reference_number = Column( String, index= True )
     external_order_id = Column( String, index = True )
     external_source = Column( String, index = True )
@@ -63,6 +64,7 @@ class Order(
     preferred_time_end   = Column(String)  # "20:00"
 
     creation_date = Column(UTCDateTime, default=lambda: datetime.now(timezone.utc))
+    items_updated_at = Column(UTCDateTime)
     
     order_state_id = Column(
         Integer,
@@ -146,6 +148,8 @@ class Order(
     )
 
     __table_args__ = (
+        UniqueConstraint("team_id", "order_scalar_id", name="uq_order_team_scalar_id"),
+        Index("ix_order_creation_date_id_desc", creation_date.desc(), id.desc()),
         # JSONB GIN indexes
         Index("ix_order_client_primary_phone_gin", client_primary_phone, postgresql_using="gin"),
         Index("ix_order_client_secondary_phone_gin", client_secondary_phone, postgresql_using="gin"),

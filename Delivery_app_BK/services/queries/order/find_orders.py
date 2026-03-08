@@ -8,7 +8,7 @@ from sqlalchemy import func, String, or_
 
 from ...context import ServiceContext
 from ...utils import to_datetime
-from ..utils import apply_pagination_by_date, str_to_bool
+from ..utils import apply_opaque_pagination_by_date, str_to_bool
 from ..item.find_items import find_items
 
 
@@ -36,6 +36,10 @@ def find_orders (
         # ---------------- ORDER FIELDS ----------------
         "reference_number": {
             "column": Order.reference_number,
+            "join": None,
+        },
+        "order_scalar_id": {
+            "column": Order.order_scalar_id.cast(String),
             "join": None,
         },
         "external_source": {
@@ -212,12 +216,12 @@ def find_orders (
 
     if params.get("sort") == 'date_asc':
         query = query.order_by( 
-            Order.earliest_delivery_date.asc(),
+            Order.creation_date.asc(),
             Order.id.asc()
         )
     else:
         query = query.order_by( 
-            Order.earliest_delivery_date.desc(),
+            Order.creation_date.desc(),
             Order.id.desc()
         )
     #----------------------------------------------------
@@ -225,9 +229,9 @@ def find_orders (
 
 
     # pagination -------------------------
-    query = apply_pagination_by_date(
+    query = apply_opaque_pagination_by_date(
         query = query,
-        date_column = Order.earliest_delivery_date,
+        date_column = Order.creation_date,
         id_column = Order.id,
         params = params,
         sort = params.get( "sort", 'date_desc')
@@ -236,5 +240,4 @@ def find_orders (
    
 
     #----------------------------------------------------
-
-    return query
+    return query.distinct()

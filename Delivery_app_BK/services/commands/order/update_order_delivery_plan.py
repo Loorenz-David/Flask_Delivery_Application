@@ -1,23 +1,35 @@
 from __future__ import annotations
 
-from sqlalchemy.exc import InvalidRequestError
+from sqlalchemy import inspect as sa_inspect
+from sqlalchemy.exc import InvalidRequestError, NoInspectionAvailable
 from sqlalchemy.orm.exc import NoResultFound
 
 from Delivery_app_BK.errors import NotFound, ValidationFailed
 from Delivery_app_BK.models import (
     DeliveryPlan,
     Order,
+    RouteSolution,
+    RouteSolutionStop,
     db,
+)
+from Delivery_app_BK.services.commands.plan.local_delivery.route_solution.plan_sync import (
+    build_incremental_route_sync_action,
+)
+from Delivery_app_BK.services.commands.plan.local_delivery.route_solution.stops import (
+    remove_orders_stops_for_local_delivery,
 )
 from Delivery_app_BK.services.infra.events.builders.order import (
     build_delivery_plan_changed_event,
 )
 from Delivery_app_BK.services.infra.events.emiters.order import emit_order_events
+from Delivery_app_BK.services.queries.route_solutions.serialize_route_solutions import (
+    serialize_route_solution,
+)
 from Delivery_app_BK.services.utils import model_requires_team, require_team_id
 
 from ...context import ServiceContext
 from ...queries.get_instance import get_instance
-from .create_serializers import serialize_created_order
+from .create_serializers import serialize_created_order, serialize_created_order_stops
 from .plan_changes import (
     PlanChangeResult,
     apply_order_plan_change,
@@ -80,10 +92,17 @@ def apply_orders_delivery_plan_change(
         plan_ids=list(relevant_plan_ids),
         relevant_plan_types=relevant_plan_types,
     )
+    old_local_delivery_batch = _prepare_old_local_delivery_batch_changes(
+        ctx=ctx,
+        apply_context=apply_context,
+        old_plans_by_id=old_plans_by_id,
+        old_plan_id_by_order_id=old_plan_id_by_order_id,
+    )
+    batched_old_local_delivery_order_ids: set[int] = old_local_delivery_batch["order_ids"]
 
     pending_events: list[dict] = []
-    extra_instances: list[object] = []
-    post_flush_actions = []
+    extra_instances: list[object] = list(old_local_delivery_batch["instances"])
+    post_flush_actions = list(old_local_delivery_batch["post_flush_actions"])
     plan_change_result_by_order_id: dict[int, PlanChangeResult] = {}
 
     for target_id in normalized_order_ids:
@@ -93,6 +112,11 @@ def apply_orders_delivery_plan_change(
 
         old_plan_id = old_plan_id_by_order_id[order_instance.id]
         old_plan = old_plans_by_id.get(old_plan_id) if old_plan_id else None
+        old_plan_for_apply = (
+            None
+            if order_instance.id in batched_old_local_delivery_order_ids
+            else old_plan
+        )
 
         order_instance.delivery_plan_id = new_plan.id
         order_instance.order_plan_objective = new_plan.plan_type
@@ -100,7 +124,7 @@ def apply_orders_delivery_plan_change(
         change_result = apply_order_plan_change(
             ctx=ctx,
             order_instance=order_instance,
-            old_plan=old_plan,
+            old_plan=old_plan_for_apply,
             new_plan=new_plan,
             apply_context=apply_context,
         )
@@ -113,7 +137,9 @@ def apply_orders_delivery_plan_change(
         )
 
     if extra_instances:
-        db.session.add_all(extra_instances)
+        sanitized_extra_instances = _sanitize_instances_for_session(extra_instances)
+        if sanitized_extra_instances:
+            db.session.add_all(sanitized_extra_instances)
 
     db.session.flush()
 
@@ -121,6 +147,14 @@ def apply_orders_delivery_plan_change(
         action()
     if post_flush_actions:
         db.session.flush()
+
+    old_local_delivery_bundle = _serialize_old_local_delivery_batch_bundle(
+        updated_stops=old_local_delivery_batch["updated_stops"],
+        synced_stops=old_local_delivery_batch["synced_stops"],
+        updated_route_solutions=old_local_delivery_batch["updated_route_solutions"],
+        synced_route_solutions=old_local_delivery_batch["synced_route_solutions"],
+    )
+    old_local_delivery_bundle_attached = False
 
     updated_bundles: list[dict] = []
     for target_id in normalized_order_ids:
@@ -134,6 +168,9 @@ def apply_orders_delivery_plan_change(
         change_result = plan_change_result_by_order_id.get(order_instance.id)
         if change_result:
             bundle.update(change_result.serialize_bundle())
+        if old_local_delivery_bundle and not old_local_delivery_bundle_attached:
+            bundle.update(old_local_delivery_bundle)
+            old_local_delivery_bundle_attached = True
 
         updated_bundles.append(bundle)
 
@@ -141,6 +178,198 @@ def apply_orders_delivery_plan_change(
         "updated": updated_bundles,
         "pending_events": pending_events,
     }
+
+
+def _prepare_old_local_delivery_batch_changes(
+    *,
+    ctx: ServiceContext,
+    apply_context,
+    old_plans_by_id: dict[int, DeliveryPlan],
+    old_plan_id_by_order_id: dict[int, int | None],
+) -> dict:
+    order_ids_by_old_local_plan_id: dict[int, list[int]] = {}
+    batched_order_ids: set[int] = set()
+
+    for order_id, old_plan_id in old_plan_id_by_order_id.items():
+        if old_plan_id is None:
+            continue
+        old_plan = old_plans_by_id.get(old_plan_id)
+        if not old_plan or getattr(old_plan, "plan_type", None) != "local_delivery":
+            continue
+        order_ids_by_old_local_plan_id.setdefault(old_plan_id, []).append(order_id)
+        batched_order_ids.add(order_id)
+
+    if not order_ids_by_old_local_plan_id:
+        return {
+            "instances": [],
+            "post_flush_actions": [],
+            "order_ids": set(),
+            "updated_stops": [],
+            "synced_stops": [],
+            "updated_route_solutions": [],
+            "synced_route_solutions": [],
+        }
+
+    updated_stops: list[RouteSolutionStop] = []
+    synced_stops: list[RouteSolutionStop] = []
+    updated_route_solutions: list[RouteSolution] = []
+    synced_route_solutions: list[RouteSolution] = []
+    starts_by_route_id: dict[int, int] = {}
+
+    for old_plan_id, order_ids in order_ids_by_old_local_plan_id.items():
+        old_local_delivery = apply_context.local_delivery_by_plan_id.get(old_plan_id)
+        if not old_local_delivery:
+            raise ValidationFailed("Local delivery plan not found for order change.")
+
+        (
+            removed_updated_stops,
+            removed_updated_route_solutions,
+            removed_starts_by_route_id,
+        ) = remove_orders_stops_for_local_delivery(order_ids, old_local_delivery.id)
+
+        updated_stops.extend(removed_updated_stops)
+        updated_route_solutions.extend(removed_updated_route_solutions)
+        starts_by_route_id = _merge_start_positions(starts_by_route_id, removed_starts_by_route_id)
+
+    post_flush_actions = []
+    if starts_by_route_id:
+        post_flush_actions.append(
+            build_incremental_route_sync_action(
+                ctx=ctx,
+                starts_by_route_id=starts_by_route_id,
+                route_solutions_by_id=_build_route_solutions_by_id_from_context(apply_context),
+                synced_stops=synced_stops,
+                changed_route_solutions=synced_route_solutions,
+            )
+        )
+
+    instances: list[object] = []
+    instances.extend(updated_stops)
+    instances.extend(updated_route_solutions)
+
+    return {
+        "instances": instances,
+        "post_flush_actions": post_flush_actions,
+        "order_ids": batched_order_ids,
+        "updated_stops": updated_stops,
+        "synced_stops": synced_stops,
+        "updated_route_solutions": updated_route_solutions,
+        "synced_route_solutions": synced_route_solutions,
+    }
+
+
+def _merge_start_positions(
+    base: dict[int, int],
+    incoming: dict[int, int],
+) -> dict[int, int]:
+    if not incoming:
+        return base
+
+    merged = dict(base)
+    for route_id, start_position in incoming.items():
+        current = merged.get(route_id)
+        merged[route_id] = (
+            start_position if current is None else min(current, start_position)
+        )
+    return merged
+
+
+def _build_route_solutions_by_id_from_context(apply_context) -> dict[int, RouteSolution]:
+    route_solutions_by_id: dict[int, RouteSolution] = {}
+    for route_solutions in apply_context.route_solutions_by_local_delivery_id.values():
+        for route_solution in route_solutions:
+            route_id = getattr(route_solution, "id", None)
+            if route_id is None:
+                continue
+            route_solutions_by_id[route_id] = route_solution
+    return route_solutions_by_id
+
+
+def _serialize_old_local_delivery_batch_bundle(
+    *,
+    updated_stops: list[RouteSolutionStop],
+    synced_stops: list[RouteSolutionStop],
+    updated_route_solutions: list[RouteSolution],
+    synced_route_solutions: list[RouteSolution],
+) -> dict:
+    stops = _dedupe_stops_for_bundle(list(updated_stops or []) + list(synced_stops or []))
+    route_solutions = _dedupe_route_solutions_for_bundle(
+        list(updated_route_solutions or []) + list(synced_route_solutions or [])
+    )
+
+    bundle: dict = {}
+    if stops:
+        bundle["order_stops"] = serialize_created_order_stops(stops)
+    if route_solutions:
+        bundle["route_solution"] = [
+            serialize_route_solution(route_solution) for route_solution in route_solutions
+        ]
+    return bundle
+
+
+def _dedupe_stops_for_bundle(stops: list[RouteSolutionStop]) -> list[RouteSolutionStop]:
+    deduped: list[RouteSolutionStop] = []
+    seen_keys: set[tuple[str, str]] = set()
+
+    for stop in stops:
+        stop_id = getattr(stop, "id", None)
+        client_id = getattr(stop, "client_id", None)
+        key = (
+            "id" if stop_id is not None else "client_id",
+            str(stop_id if stop_id is not None else client_id),
+        )
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        deduped.append(stop)
+
+    return sorted(
+        deduped,
+        key=lambda stop: (
+            stop.stop_order if getattr(stop, "stop_order", None) is not None else 10**9,
+            getattr(stop, "id", 10**9),
+            getattr(stop, "client_id", ""),
+        ),
+    )
+
+
+def _dedupe_route_solutions_for_bundle(
+    route_solutions: list[RouteSolution],
+) -> list[RouteSolution]:
+    deduped: list[RouteSolution] = []
+    seen_ids: set[int] = set()
+
+    for route_solution in route_solutions:
+        route_id = getattr(route_solution, "id", None)
+        if route_id is None or route_id in seen_ids:
+            continue
+        seen_ids.add(route_id)
+        deduped.append(route_solution)
+    return deduped
+
+
+def _sanitize_instances_for_session(instances: list[object]) -> list[object]:
+    sanitized: list[object] = []
+    seen_instance_ids: set[int] = set()
+
+    for instance in instances:
+        if instance is None:
+            continue
+        instance_ref = id(instance)
+        if instance_ref in seen_instance_ids:
+            continue
+        seen_instance_ids.add(instance_ref)
+
+        try:
+            inspected = sa_inspect(instance)
+            if getattr(inspected, "deleted", False):
+                continue
+        except NoInspectionAvailable:
+            pass
+
+        sanitized.append(instance)
+
+    return sanitized
 
 
 def update_orders_delivery_plan(

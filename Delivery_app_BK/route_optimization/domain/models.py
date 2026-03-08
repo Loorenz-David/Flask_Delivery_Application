@@ -24,9 +24,16 @@ class TimeWindow:
 
 
 @dataclass(frozen=True)
-class Shipment:
+class ShipmentMember:
     order_id: int
+    service_duration_seconds: int = 0
+
+
+@dataclass(frozen=True)
+class Shipment:
+    label: str
     location: Dict[str, float]
+    members: List[ShipmentMember] = field(default_factory=list)
     time_windows: List[TimeWindow] = field(default_factory=list)
     service_duration_seconds: Optional[int] = None
 
@@ -48,6 +55,8 @@ class OptimizationRequest:
     objectives: List[Dict[str, Any]]
     travel_mode: str
     cost_per_kilometer: float
+    pre_skipped_shipments: List["SkippedShipment"] = field(default_factory=list)
+    excluded_shipments: List[Shipment] = field(default_factory=list)
     populate_transition_polylines: bool = True
     injected_routes: Optional[List[Dict[str, Any]]] = None
     interpret_injected_solutions_using_labels: bool = False
@@ -55,7 +64,7 @@ class OptimizationRequest:
 
 @dataclass(frozen=True)
 class StopResult:
-    order_id: int
+    shipment_label: str
     stop_order: int
     expected_arrival_time: Optional[datetime]
     in_range: bool
@@ -63,7 +72,7 @@ class StopResult:
 
 @dataclass(frozen=True)
 class SkippedShipment:
-    order_id: int
+    shipment_label: str
     reason: Optional[str] = None
 
 

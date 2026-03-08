@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime, time as time_cls, timezone
+from datetime import datetime
 from typing import List, Tuple
 
 from Delivery_app_BK.errors import ValidationFailed
@@ -21,7 +21,11 @@ from Delivery_app_BK.route_optimization.constants.route_end_strategy import (
     ROUND_TRIP,
 )
 from Delivery_app_BK.services.commands.utils import generate_client_id
-from Delivery_app_BK.services.domain.local_delivery import normalize_service_time_payload
+from Delivery_app_BK.services.domain.local_delivery import (
+    combine_plan_date_and_local_hhmm_to_utc,
+    normalize_service_time_payload,
+    resolve_request_timezone,
+)
 
 from ...context import ServiceContext
 from ..base.create_instance import create_instance
@@ -162,9 +166,11 @@ def _normalize_local_delivery_route_solution_defaults(
 
     raw_start_time = route_solution_defaults.get("set_start_time")
     set_start_time = raw_start_time if isinstance(raw_start_time, str) else None
+    request_timezone = resolve_request_timezone(ctx, plan_instance)
     expected_start_time = _build_expected_start_time(
         plan_start=plan_instance.start_date,
         set_start_time=set_start_time,
+        request_timezone=request_timezone,
     )
 
     raw_end_time = route_solution_defaults.get("set_end_time")
@@ -186,56 +192,13 @@ def _normalize_local_delivery_route_solution_defaults(
         "route_end_strategy": route_end_strategy,
         "driver_id": driver_id,
     }
-
-
-def _parse_hhmm(value: str | None) -> time_cls | None:
-    if not isinstance(value, str):
-        return None
-
-    parsed = value.strip()
-    if not parsed:
-        return None
-
-    parts = parsed.split(":")
-    if len(parts) not in (2, 3):
-        return None
-
-    try:
-        hour = int(parts[0])
-        minute = int(parts[1])
-        second = int(parts[2]) if len(parts) == 3 else 0
-        return time_cls(hour=hour, minute=minute, second=second)
-    except (TypeError, ValueError):
-        return None
-
-
-def _ensure_utc_datetime(value: datetime | None) -> datetime | None:
-    if value is None:
-        return None
-    if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
-
-
 def _build_expected_start_time(
     plan_start: datetime | None,
     set_start_time: str | None,
+    request_timezone,
 ) -> datetime | None:
-    normalized_start = _ensure_utc_datetime(plan_start)
-    parsed_time = _parse_hhmm(set_start_time)
-
-    if not normalized_start or not parsed_time:
-        return None
-
-    # Store the exact HH:mm user-set clock time on the plan UTC date,
-    # without timezone conversion.
-    combined_start = datetime(
-        year=normalized_start.year,
-        month=normalized_start.month,
-        day=normalized_start.day,
-        hour=parsed_time.hour,
-        minute=parsed_time.minute,
-        second=parsed_time.second,
-        tzinfo=timezone.utc,
+    return combine_plan_date_and_local_hhmm_to_utc(
+        plan_date=plan_start,
+        hhmm=set_start_time,
+        tz=request_timezone,
     )
-    return combined_start

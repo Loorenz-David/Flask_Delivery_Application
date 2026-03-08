@@ -50,7 +50,7 @@ class GoogleRequestMapper:
 
             shipments.append(
                 {
-                    "label": f"{shipment.order_id}-{request.route_solution_id}",
+                    "label": shipment.label,
                     "deliveries": [delivery],
                 }
             )
@@ -136,13 +136,13 @@ class GoogleResponseMapper:
         
         stops: List[StopResult] = []
         for idx, visit in enumerate(visits):
-            order_id = _parse_shipment_label(visit)
-            if order_id is None:
+            shipment_label = _parse_shipment_label(visit)
+            if shipment_label is None:
                 continue
             arrival_time = _parse_time(visit.get("arrival_time") or visit.get("start_time"))
             stops.append(
                 StopResult(
-                    order_id=order_id,
+                    shipment_label=shipment_label,
                     stop_order=idx + 1,
                     expected_arrival_time=arrival_time,
                     in_range=True,
@@ -151,11 +151,11 @@ class GoogleResponseMapper:
 
         skipped: List[SkippedShipment] = []
         for entry in response_dict.get("skipped_shipments", []):
-            order_id = _parse_shipment_label(entry)
-            if order_id is None:
+            shipment_label = _parse_shipment_label(entry)
+            if shipment_label is None:
                 continue
             skipped.append(
-                SkippedShipment(order_id=order_id, reason=entry.get("reasons"))
+                SkippedShipment(shipment_label=shipment_label, reason=entry.get("reasons"))
             )
 
         expected_start = (
@@ -215,14 +215,11 @@ def _extract_number(value: str) -> int | None:
     match = re.search(r"\d+", value)
     return int(match.group()) if match else None
 
-def _parse_shipment_label(payload: Dict[str, Any]) -> Optional[int]:
+def _parse_shipment_label(payload: Dict[str, Any]) -> Optional[str]:
     label = payload.get("shipment_label") or payload.get("label")
     if not label:
         return None
-    try:
-        return int(str(label).split("-")[0])
-    except (TypeError, ValueError):
-        return None
+    return str(label)
 
 
 def _parse_time(value: Any) -> Optional[datetime]:

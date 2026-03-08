@@ -4,10 +4,13 @@ from .build_maps import (
 )
 from .pagination_by_date import ( 
     apply_pagination_by_date,
+    apply_opaque_pagination_by_date,
     is_pagination_backwards,
     build_cursor,
     build_pagination,
-    
+    build_opaque_pagination,
+    encode_opaque_cursor,
+    decode_opaque_cursor,
 )
 from .pagination_by_id import (
     apply_pagination_by_id,
@@ -28,4 +31,3 @@ from .format_data import (
     str_to_bool,
     parsed_string_to_list
 )
-

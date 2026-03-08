@@ -23,8 +23,9 @@ def build_user_tokens(user: User) -> dict:
     base_role: BaseRole = user_role.base_role
     team:Team = user.team
     identity_data = str(user.id)
+    effective_time_zone = team.time_zone or "UTC"
 
-    claims = _build_auth_claims(user, time_zone= team.time_zone)
+    claims = _build_auth_claims(user, time_zone=effective_time_zone)
 
     access_token = create_access_token(identity=identity_data, additional_claims=claims)
     refresh_token = create_refresh_token(identity=identity_data, additional_claims=claims)
@@ -39,7 +40,8 @@ def build_user_tokens(user: User) -> dict:
         "base_role_id": base_role.id,
         "show_app_tutorial": user.show_app_tutorial,
         "id": user.id,
-        "team_name":user.team.name
+        "team_name":user.team.name,
+
     }
 
     return {

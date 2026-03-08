@@ -32,8 +32,10 @@ def model_requires_team(Model: Any) -> bool:
 
 
 def inject_team_id(fields: Dict[str, Any], ctx: ServiceContext) -> Dict[str, Any]:
-    if not isinstance(fields, dict):
+    if not hasattr(fields, "items"):
         raise ValidationFailed("Fields must be provided as a dictionary")
+
+    fields = dict(fields)
 
     
     if "team_id" not in fields:
@@ -47,6 +49,5 @@ def is_system_default(obj: Any) -> bool:
             return True
 
     return False
-
 
 

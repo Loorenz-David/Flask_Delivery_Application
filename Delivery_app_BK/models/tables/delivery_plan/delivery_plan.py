@@ -91,3 +91,7 @@ class DeliveryPlan(db.Model, TeamScopedMixin):
                 f"Allowed values: {self.PLAN_TYPES}"
             )
         return value
+
+    __table_args__ = (
+        Index("ix_delivery_plan_created_at_id_desc", created_at.desc(), id.desc()),
+    )

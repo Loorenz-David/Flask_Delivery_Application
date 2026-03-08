@@ -5,6 +5,8 @@ ORDER_CHANGE_DELIVERY_PLAN_AFTER_OPTIMIZATION = "This order was moved to a new d
 
 OUTSIDE_TIME_WINDOW = "This order could not be scheduled within the allowed delivery time window.",
 
+OUTSIDE_OPTIMIZATION_WINDOW = "This order falls outside the selected optimization time range.",
+
 ADDRESS_INVALID = "This order was skipped because the address could not be validated.",
 
 CAPACITY_EXCEEDED = "This order exceeds the vehicle’s capacity for this route.",

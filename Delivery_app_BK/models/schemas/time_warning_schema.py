@@ -7,6 +7,7 @@ TIME_WARNING_SCHEMA = {
             "type": "string",
             "enum": [
                 "time_window_violation",
+                "optimization_window_excluded",
                 "route_end_time_exceeded",
                 "low_slack"
             ]
