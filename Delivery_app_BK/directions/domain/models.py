@@ -13,6 +13,20 @@ class DirectionsStopInput:
 
 
 @dataclass(frozen=True)
+class DirectionsVisitStopMember:
+    stop_id: Optional[int]
+    order_id: int
+    service_duration_seconds: int = 0
+
+
+@dataclass(frozen=True)
+class DirectionsVisitGroup:
+    location: Dict[str, float]
+    location_key: str
+    members: List[DirectionsVisitStopMember] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class DirectionsRequest:
     origin: Dict[str, float]
     destination: Dict[str, float]
@@ -48,3 +62,4 @@ class DirectionsRequestBuildResult:
     effective_start_position: int
     anchor_order_id: Optional[int] = None
     affected_order_ids: List[int] = field(default_factory=list)
+    visit_groups: List[DirectionsVisitGroup] = field(default_factory=list)

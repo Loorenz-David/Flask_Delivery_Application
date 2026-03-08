@@ -1,10 +1,10 @@
-from datetime import datetime, time as time_cls, timezone
+from datetime import datetime
 from typing import Optional, Tuple
 
-from Delivery_app_BK.directions.services.request_builder import (
-    _coerce_datetime,
-    _combine_date_time,
-    _parse_time_string,
+from Delivery_app_BK.services.domain.local_delivery import (
+    combine_plan_date_and_local_hhmm_to_utc,
+    ensure_utc_datetime,
+    resolve_request_timezone,
 )
 from Delivery_app_BK.errors import ValidationFailed
 
@@ -14,29 +14,26 @@ def resolve_window(
     plan_end: datetime,
     set_start_time: Optional[str],
     set_end_time: Optional[str],
+    *,
+    time_zone: str | None = None,
 ) -> Optional[Tuple[datetime, datetime]]:
-    start_date = _coerce_datetime(plan_start)
-    end_date = _coerce_datetime(plan_end)
+    start_date = ensure_utc_datetime(plan_start)
+    end_date = ensure_utc_datetime(plan_end)
     if not start_date or not end_date:
         return None
 
-    if start_date.tzinfo is None:
-        start_date = start_date.replace(tzinfo=timezone.utc)
-    if end_date.tzinfo is None:
-        end_date = end_date.replace(tzinfo=timezone.utc)
-
-    start_time = _parse_time_string(set_start_time) if set_start_time else None
-    end_time = _parse_time_string(set_end_time) if set_end_time else None
-
-    window_start = _combine_date_time(start_date, start_time) or datetime.combine(
-        start_date.date(),
-        time_cls(0, 0, 0),
-        tzinfo=start_date.tzinfo,
+    request_timezone = resolve_request_timezone(
+        identity={"time_zone": time_zone} if time_zone else None,
     )
-    window_end = _combine_date_time(end_date, end_time) or datetime.combine(
-        end_date.date(),
-        time_cls(23, 59, 59),
-        tzinfo=end_date.tzinfo,
+    window_start = combine_plan_date_and_local_hhmm_to_utc(
+        start_date,
+        set_start_time or "00:00:00",
+        request_timezone,
+    )
+    window_end = combine_plan_date_and_local_hhmm_to_utc(
+        end_date,
+        set_end_time or "23:59:59",
+        request_timezone,
     )
 
     return window_start, window_end

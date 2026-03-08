@@ -48,6 +48,19 @@ class TimeWarningFactory:
         })
 
     @staticmethod
+    def optimization_window_excluded(
+        allowed_start: datetime,
+        allowed_end: datetime
+    ) -> dict:
+        return TimeWarningFactory._validate_warning({
+            "type": "optimization_window_excluded",
+            "severity": "error",
+            "message": "Order time windows are outside the selected optimization time range",
+            "allowed_start": allowed_start.isoformat(),
+            "allowed_end": allowed_end.isoformat()
+        })
+
+    @staticmethod
     def low_slack(slack_minutes: int) -> dict:
         return TimeWarningFactory._validate_warning({
             "type": "low_slack",

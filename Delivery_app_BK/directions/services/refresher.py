@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, time as time_cls, timezone
+from datetime import datetime, time as time_cls, timezone, timedelta
 from typing import Dict, List, Optional
 
 from Delivery_app_BK.models import Order, RouteSolution, RouteSolutionStop
@@ -11,6 +11,8 @@ from Delivery_app_BK.models.mixins.validation_mixins.time_warning_validation imp
 from Delivery_app_BK.directions.domain.models import (
     DirectionsRequestBuildResult,
     DirectionsResult,
+    DirectionsVisitGroup,
+    DirectionsVisitStopMember,
 )
 from Delivery_app_BK.directions.services.request_builder import (
     _parse_time_string,
@@ -19,6 +21,10 @@ from Delivery_app_BK.directions.services.time_window_policy import (
     apply_stop_time_window_evaluation,
     build_stop_time_warnings,
     ensure_utc,
+)
+from Delivery_app_BK.services.domain.local_delivery import (
+    combine_plan_date_and_local_hhmm_to_utc,
+    resolve_request_timezone,
 )
 
 
@@ -56,39 +62,48 @@ def apply_directions_result(
     route_solution.has_route_warnings = bool(route_warnings)
 
     anchor_stop, affected_stops = _resolve_scope_stops(route_solution, build_result)
-    stop_results_by_order_id = {
-        stop_result.order_id: stop_result for stop_result in directions_result.stop_results
-    }
-
     changed_stops: list[RouteSolutionStop] = []
+    visit_groups = build_result.visit_groups or _fallback_visit_groups(affected_stops)
+    resolved_groups = _resolve_group_stops(affected_stops, visit_groups)
+    grouped_results = directions_result.stop_results
 
-    for stop in affected_stops:
-        if not stop.order_id:
+    for index, group_stops in enumerate(resolved_groups):
+        if not group_stops:
             continue
-        stop_result = stop_results_by_order_id.get(stop.order_id)
+
+        stop_result = grouped_results[index] if index < len(grouped_results) else None
         if stop_result is None:
-            stop.expected_arrival_time = None
-            stop.eta_status = "stale"
-            stop.has_constraint_violation = False
-            stop.constraint_warnings = None
-            stop.in_range = False
-            stop.reason_was_skipped = "Route timing unavailable"
-            changed_stops.append(stop)
+            for stop in group_stops:
+                _mark_stop_stale(stop)
+                changed_stops.append(stop)
             continue
 
-        stop.expected_arrival_time = _ensure_utc(stop_result.arrival_time)
-        stop.eta_status = "estimated"
-        stop.in_range = True
-        stop.reason_was_skipped = None
+        current_arrival = _ensure_utc(stop_result.arrival_time)
+        visit_group = visit_groups[index] if index < len(visit_groups) else None
+        group_members = list(visit_group.members) if visit_group else []
 
-        order_instance = orders_by_id.get(stop.order_id) or getattr(stop, "order", None)
-        apply_stop_time_window_evaluation(
-            stop=stop,
-            order=order_instance,
-            route_solution=route_solution,
-            arrival_time=stop.expected_arrival_time,
-        )
-        changed_stops.append(stop)
+        for member_index, stop in enumerate(group_stops):
+            stop.expected_arrival_time = current_arrival
+            stop.eta_status = "estimated"
+            stop.in_range = True
+            stop.reason_was_skipped = None
+
+            order_instance = orders_by_id.get(stop.order_id) or getattr(stop, "order", None)
+            apply_stop_time_window_evaluation(
+                stop=stop,
+                order=order_instance,
+                route_solution=route_solution,
+                arrival_time=stop.expected_arrival_time,
+            )
+            changed_stops.append(stop)
+
+            if current_arrival is None:
+                continue
+
+            service_seconds = 0
+            if member_index < len(group_members):
+                service_seconds = int(group_members[member_index].service_duration_seconds or 0)
+            current_arrival = current_arrival + timedelta(seconds=service_seconds)
 
     changed_stops.extend(
         _apply_segment_polylines(
@@ -96,7 +111,7 @@ def apply_directions_result(
             leg_polylines=directions_result.leg_polylines,
             full_recompute=build_result.full_recompute,
             anchor_stop=anchor_stop,
-            affected_stops=affected_stops,
+            visit_groups=resolved_groups,
         )
     )
 
@@ -136,7 +151,7 @@ def _apply_segment_polylines(
     leg_polylines: list[Optional[str]],
     full_recompute: bool,
     anchor_stop: RouteSolutionStop | None,
-    affected_stops: list[RouteSolutionStop],
+    visit_groups: list[list[RouteSolutionStop]],
 ) -> list[RouteSolutionStop]:
     changed: list[RouteSolutionStop] = []
 
@@ -149,17 +164,16 @@ def _apply_segment_polylines(
         route_solution.start_leg_polyline = _leg(0)
 
     if full_recompute:
-        for index, stop in enumerate(affected_stops):
-            stop.to_next_polyline = _leg(index + 1) if index + 1 < len(affected_stops) else None
-            changed.append(stop)
-
-        route_solution.end_leg_polyline = _leg(len(affected_stops))
+        for index, group_stops in enumerate(visit_groups):
+            outbound_polyline = _leg(index + 1) if index + 1 < len(visit_groups) else None
+            changed.extend(_apply_group_polyline(group_stops, outbound_polyline))
+        route_solution.end_leg_polyline = _leg(len(visit_groups))
         return changed
 
     if anchor_stop is None:
         return changed
 
-    if not affected_stops:
+    if not visit_groups:
         anchor_stop.to_next_polyline = None
         route_solution.end_leg_polyline = _leg(0)
         changed.append(anchor_stop)
@@ -168,11 +182,26 @@ def _apply_segment_polylines(
     anchor_stop.to_next_polyline = _leg(0)
     changed.append(anchor_stop)
 
-    for index, stop in enumerate(affected_stops):
-        stop.to_next_polyline = _leg(index + 1) if index + 1 < len(affected_stops) else None
-        changed.append(stop)
+    for index, group_stops in enumerate(visit_groups):
+        outbound_polyline = _leg(index + 1) if index + 1 < len(visit_groups) else None
+        changed.extend(_apply_group_polyline(group_stops, outbound_polyline))
 
-    route_solution.end_leg_polyline = _leg(len(affected_stops))
+    route_solution.end_leg_polyline = _leg(len(visit_groups))
+    return changed
+
+
+def _apply_group_polyline(
+    group_stops: list[RouteSolutionStop],
+    outbound_polyline: Optional[str],
+) -> list[RouteSolutionStop]:
+    changed: list[RouteSolutionStop] = []
+    if not group_stops:
+        return changed
+
+    last_index = len(group_stops) - 1
+    for index, stop in enumerate(group_stops):
+        stop.to_next_polyline = outbound_polyline if index == last_index else None
+        changed.append(stop)
     return changed
 
 
@@ -189,26 +218,95 @@ def _dedupe_stops(stops: list[RouteSolutionStop]) -> list[RouteSolutionStop]:
     return deduped
 
 
+def _resolve_group_stops(
+    affected_stops: list[RouteSolutionStop],
+    visit_groups: list[DirectionsVisitGroup],
+) -> list[list[RouteSolutionStop]]:
+    stop_by_id = {
+        stop.id: stop
+        for stop in affected_stops
+        if getattr(stop, "id", None) is not None
+    }
+    unused_by_order_id = {
+        stop.order_id: stop
+        for stop in affected_stops
+        if getattr(stop, "order_id", None) is not None
+    }
+
+    resolved: list[list[RouteSolutionStop]] = []
+    for group in visit_groups:
+        group_stops: list[RouteSolutionStop] = []
+        for member in group.members:
+            stop = None
+            if member.stop_id is not None:
+                stop = stop_by_id.pop(member.stop_id, None)
+            if stop is None and member.order_id is not None:
+                stop = unused_by_order_id.pop(member.order_id, None)
+            if stop is not None:
+                if getattr(stop, "id", None) is not None:
+                    stop_by_id.pop(stop.id, None)
+                if getattr(stop, "order_id", None) is not None:
+                    unused_by_order_id.pop(stop.order_id, None)
+                group_stops.append(stop)
+        resolved.append(group_stops)
+    return resolved
+
+
+def _fallback_visit_groups(
+    affected_stops: list[RouteSolutionStop],
+) -> list[DirectionsVisitGroup]:
+    fallback: list[DirectionsVisitGroup] = []
+    for stop in affected_stops:
+        if not getattr(stop, "order_id", None):
+            continue
+        fallback.append(
+            DirectionsVisitGroup(
+                location={},
+                location_key=str(getattr(stop, "id", getattr(stop, "order_id", ""))),
+                members=[
+                    DirectionsVisitStopMember(
+                        stop_id=getattr(stop, "id", None),
+                        order_id=stop.order_id,
+                        service_duration_seconds=0,
+                    )
+                ],
+            )
+        )
+    return fallback
+
+
+def _mark_stop_stale(stop: RouteSolutionStop) -> None:
+    stop.expected_arrival_time = None
+    stop.eta_status = "stale"
+    stop.has_constraint_violation = False
+    stop.constraint_warnings = None
+    stop.in_range = False
+    stop.reason_was_skipped = "Route timing unavailable"
+
+
 def _resolve_allowed_end(route_solution: RouteSolution) -> Optional[datetime]:
     if not route_solution.local_delivery_plan:
         return None
     delivery_plan = route_solution.local_delivery_plan.delivery_plan
     if not delivery_plan or not delivery_plan.end_date:
         return None
-
-    end_date = delivery_plan.end_date
-    if end_date.tzinfo is None:
-        end_date = end_date.replace(tzinfo=timezone.utc)
+    request_timezone = resolve_request_timezone(
+        plan_instance=route_solution.local_delivery_plan,
+    )
 
     if route_solution.set_end_time:
         parsed = _parse_time_string(route_solution.set_end_time)
         if parsed:
-            return datetime.combine(end_date.date(), parsed, tzinfo=end_date.tzinfo)
+            return combine_plan_date_and_local_hhmm_to_utc(
+                plan_date=delivery_plan.end_date,
+                hhmm=route_solution.set_end_time,
+                tz=request_timezone,
+            )
 
-    return datetime.combine(
-        end_date.date(),
-        time_cls(23, 59, 59),
-        tzinfo=end_date.tzinfo,
+    return combine_plan_date_and_local_hhmm_to_utc(
+        plan_date=delivery_plan.end_date,
+        hhmm="23:59:59",
+        tz=request_timezone,
     )
 
 

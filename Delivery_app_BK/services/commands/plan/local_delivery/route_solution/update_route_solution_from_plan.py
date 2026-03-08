@@ -55,12 +55,14 @@ def update_route_solution_from_plan(
         previous_plan_end or plan_end,
         old_set_start_time,
         old_set_end_time,
+        time_zone=time_zone,
     )
     new_window = resolve_window(
         plan_start,
         plan_end,
         route_solution.set_start_time,
         route_solution.set_end_time,
+        time_zone=time_zone,
     )
    
     validate_window(new_window)

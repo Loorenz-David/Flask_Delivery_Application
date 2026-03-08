@@ -24,6 +24,7 @@ from .tables.items.item_property import ItemProperty
 from .tables.items.item_state import ItemState
 from .tables.items.item_position import ItemPosition
 from .tables.order.order import Order
+from .tables.order.order_scalar_counter import OrderScalarCounter
 from .tables.order.order_delivery_window import OrderDeliveryWindow
 from .tables.order.order_audit_log import OrderAuditLog
 from .tables.order.order_event import OrderEvent

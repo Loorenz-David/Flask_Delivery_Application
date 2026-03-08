@@ -164,3 +164,49 @@ def test_set_end_change_can_clear_route_end_time_exceeded_warning():
     )
     assert updated.has_route_warnings is False
     assert updated.route_warnings is None
+
+
+def test_set_start_updates_expected_times_and_rechecks_violations_when_moved_backward():
+    plan_start = datetime(2026, 2, 28, 0, 0, 0, tzinfo=timezone.utc)
+    plan_end = datetime(2026, 2, 28, 23, 59, 59, tzinfo=timezone.utc)
+    arrival = datetime(2026, 2, 28, 10, 0, 0, tzinfo=timezone.utc)
+
+    route_solution = _build_route_solution(set_start_time="10:00:00", arrival=arrival)
+    route_solution.expected_end_time = datetime(2026, 2, 28, 20, 0, 0, tzinfo=timezone.utc)
+    route_solution.stops[0].order = SimpleNamespace(
+        earliest_delivery_date=None,
+        latest_delivery_date=None,
+        preferred_time_start=None,
+        preferred_time_end=None,
+        delivery_windows=[
+            SimpleNamespace(
+                start_at=datetime(2026, 2, 28, 9, 30, 0, tzinfo=timezone.utc),
+                end_at=datetime(2026, 2, 28, 10, 30, 0, tzinfo=timezone.utc),
+            )
+        ],
+    )
+
+    updated, stops_changed, _ = update_route_solution_from_plan(
+        route_solution=route_solution,
+        updates={"set_start_time": "09:00:00"},
+        plan_start=plan_start,
+        plan_end=plan_end,
+        previous_plan_start=plan_start,
+        previous_plan_end=plan_end,
+        create_variant_on_save=False,
+        time_zone="UTC",
+    )
+
+    assert stops_changed is True
+    assert updated.expected_start_time == datetime(
+        2026, 2, 28, 9, 0, 0, tzinfo=timezone.utc
+    )
+    assert updated.expected_end_time == datetime(
+        2026, 2, 28, 19, 0, 0, tzinfo=timezone.utc
+    )
+    assert updated.stops[0].expected_arrival_time == datetime(
+        2026, 2, 28, 9, 0, 0, tzinfo=timezone.utc
+    )
+    assert updated.stops[0].has_constraint_violation is True
+    assert updated.stops[0].constraint_warnings
+    assert updated.stops[0].constraint_warnings[0]["type"] == "time_window_violation"

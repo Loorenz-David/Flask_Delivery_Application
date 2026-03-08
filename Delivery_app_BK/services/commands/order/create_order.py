@@ -1,5 +1,6 @@
 from collections import defaultdict
 from collections.abc import Callable
+from datetime import datetime, timezone
 
 from sqlalchemy.exc import InvalidRequestError
 
@@ -36,6 +37,7 @@ from ...domain.order.delivery_windows import (
     validate_and_normalize_delivery_windows,
     validate_same_local_day_delivery_windows,
 )
+from ...domain.order.order_scalar_id import reserve_order_scalar_ids
 
 
 def create_order(ctx: ServiceContext):
@@ -108,9 +110,15 @@ def create_order(ctx: ServiceContext):
         post_flush_actions: list[Callable[[], None]] = []
         items_by_order_client_id: dict[str, list[Item]] = defaultdict(list)
         plan_objective_results_by_order_client_id: dict[str, PlanObjectiveCreateResult] = {}
+        allocated_scalar_ids = reserve_order_scalar_ids(ctx, len(order_requests))
 
-        for order_request, resolved_costumer in zip(order_requests, resolved_costumers):
+        for order_request, resolved_costumer, order_scalar_id in zip(
+            order_requests,
+            resolved_costumers,
+            allocated_scalar_ids,
+        ):
             order_fields = dict(order_request.fields)
+            order_fields["order_scalar_id"] = order_scalar_id
             normalized_windows = None
             if order_request.delivery_windows is not None:
                 normalized_windows = validate_and_normalize_delivery_windows(
@@ -163,6 +171,9 @@ def create_order(ctx: ServiceContext):
                 order_instance.items.append(item_instance)
                 item_instances.append(item_instance)
                 items_by_order_client_id[order_instance.client_id].append(item_instance)
+
+            if order_request.items:
+                order_instance.items_updated_at = datetime.now(timezone.utc)
 
             if delivery_plan:
                 objective_result = apply_order_plan_objective(

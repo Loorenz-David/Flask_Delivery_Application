@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 from datetime import datetime, time as time_cls, timezone, timedelta
-from zoneinfo import ZoneInfo
 from typing import Any, Dict, List, Optional, Tuple
 
 from Delivery_app_BK.errors import ValidationFailed
 from Delivery_app_BK.models import Order, RouteSolution, RouteSolutionStop
 from Delivery_app_BK.services.domain.local_delivery import (
     calculate_service_time_seconds,
+    combine_plan_date_and_local_hhmm_to_utc,
+    ensure_utc_datetime,
     normalize_service_time_payload,
     parse_duration_seconds,
+    parse_hhmm,
     resolve_effective_service_time_payload,
+    resolve_request_timezone,
     resolve_order_item_quantity,
 )
 
@@ -18,6 +21,8 @@ from Delivery_app_BK.directions.domain.models import (
     DirectionsRequest,
     DirectionsRequestBuildResult,
     DirectionsStopInput,
+    DirectionsVisitGroup,
+    DirectionsVisitStopMember,
 )
 from Delivery_app_BK.route_optimization.constants.route_end_strategy import (
     ROUND_TRIP,
@@ -104,7 +109,7 @@ def build_directions_request_bundle(
     default_service_time = normalize_service_time_payload(
         route_solution.stops_service_time
     )
-    intermediates = _build_intermediates(
+    intermediates, visit_groups = _build_intermediates(
         recalculated_stops,
         orders_by_id,
         default_service_time=default_service_time,
@@ -136,6 +141,7 @@ def build_directions_request_bundle(
         effective_start_position=effective_start_position,
         anchor_order_id=anchor_stop.order_id if anchor_stop else None,
         affected_order_ids=[stop.order_id for stop in recalculated_stops if stop.order_id],
+        visit_groups=visit_groups,
     )
 
 
@@ -204,8 +210,10 @@ def _build_intermediates(
     orders_by_id: Dict[int, Order],
     *,
     default_service_time: dict | None,
-) -> list[DirectionsStopInput]:
+) -> tuple[list[DirectionsStopInput], list[DirectionsVisitGroup]]:
     intermediates: list[DirectionsStopInput] = []
+    visit_groups: list[DirectionsVisitGroup] = []
+
     for stop in stops:
         if not stop.order_id:
             continue
@@ -220,14 +228,50 @@ def _build_intermediates(
             order=order,
             default_service_time=default_service_time,
         )
+        normalized_service_seconds = int(service_duration_seconds or 0)
+        member = DirectionsVisitStopMember(
+            stop_id=getattr(stop, "id", None),
+            order_id=order.id,
+            service_duration_seconds=normalized_service_seconds,
+        )
+        location_key = _location_group_key(coords)
+
+        if (
+            visit_groups
+            and visit_groups[-1].location_key == location_key
+        ):
+            previous_group = visit_groups[-1]
+            visit_groups[-1] = DirectionsVisitGroup(
+                location=previous_group.location,
+                location_key=previous_group.location_key,
+                members=[*previous_group.members, member],
+            )
+            previous_input = intermediates[-1]
+            intermediates[-1] = DirectionsStopInput(
+                order_id=previous_input.order_id,
+                location=previous_input.location,
+                service_duration_seconds=(
+                    int(previous_input.service_duration_seconds or 0)
+                    + normalized_service_seconds
+                ),
+            )
+            continue
+
+        visit_groups.append(
+            DirectionsVisitGroup(
+                location=coords,
+                location_key=location_key,
+                members=[member],
+            )
+        )
         intermediates.append(
             DirectionsStopInput(
                 order_id=order.id,
                 location=coords,
-                service_duration_seconds=service_duration_seconds,
+                service_duration_seconds=normalized_service_seconds,
             )
         )
-    return intermediates
+    return intermediates, visit_groups
 
 
 def _resolve_recompute_departure_time(
@@ -364,34 +408,34 @@ def _resolve_departure_time(
 ) -> Optional[datetime]:
     now = datetime.now(timezone.utc)
 
-    if time_zone:
-        user_tz = ZoneInfo(time_zone)
-        now_local = now.astimezone(user_tz)
-        normalized = now_local.replace(tzinfo=timezone.utc)
-        now = normalized
-
-
     plan_start = None
+    timezone_plan = None
     if route_solution.local_delivery_plan and route_solution.local_delivery_plan.delivery_plan:
         plan = route_solution.local_delivery_plan.delivery_plan
+        timezone_plan = route_solution.local_delivery_plan
         if plan.start_date:
             plan_start = _coerce_datetime(plan.start_date)
 
-
+    request_timezone = resolve_request_timezone(
+        plan_instance=timezone_plan,
+        identity={"time_zone": time_zone} if time_zone else None,
+    )
 
     if route_solution.set_start_time:
         parsed = _coerce_datetime(route_solution.set_start_time)
         if parsed:
             return parsed
-        time_only = _parse_time_string(route_solution.set_start_time)
+        time_only = parse_hhmm(route_solution.set_start_time)
         if time_only:
-            return _combine_date_time(plan_start or now, time_only)
+            return combine_plan_date_and_local_hhmm_to_utc(
+                plan_date=plan_start or now,
+                hhmm=route_solution.set_start_time,
+                tz=request_timezone,
+            )
 
     min_start = now + timedelta(minutes=5)
     if plan_start:
-        if plan_start.tzinfo is None:
-            plan_start = plan_start.replace(tzinfo=timezone.utc)
-
+        plan_start = ensure_utc_datetime(plan_start)
         return plan_start if plan_start > min_start else min_start
 
     return min_start
@@ -431,6 +475,13 @@ def _resolve_stop_service_duration_seconds(
     if calculated is not None:
         return calculated
     return parse_duration_seconds(stop.service_duration)
+
+
+def _location_group_key(location: Dict[str, float]) -> str:
+    return (
+        f"{float(location['latitude']):.6f},"
+        f"{float(location['longitude']):.6f}"
+    )
 
 
 def _combine_date_time(base: datetime, time_value: Optional[time_cls]) -> Optional[datetime]:

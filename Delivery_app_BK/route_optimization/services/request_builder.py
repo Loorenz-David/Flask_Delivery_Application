@@ -7,17 +7,24 @@ from Delivery_app_BK.errors import ValidationFailed
 from Delivery_app_BK.route_optimization.domain.models import (
     OptimizationContext,
     OptimizationRequest,
+    SkippedShipment,
     Shipment,
+    ShipmentMember,
     TimeWindow,
 )
 from Delivery_app_BK.services.domain.local_delivery import (
     calculate_service_time_seconds,
+    combine_plan_date_and_local_hhmm_to_utc,
     normalize_service_time_payload,
     parse_duration_seconds,
     resolve_effective_service_time_payload,
+    resolve_request_timezone,
     resolve_order_item_quantity,
 )
 from Delivery_app_BK.route_optimization.constants.route_end_strategy import ROUND_TRIP,  LAST_STOP
+from Delivery_app_BK.route_optimization.constants.skip_reasons import (
+    OUTSIDE_OPTIMIZATION_WINDOW,
+)
 
 DEFAULT_ROUTE_MODIFIERS = {
     "avoid_tolls": False,
@@ -72,12 +79,15 @@ def build_request(context: OptimizationContext) -> OptimizationRequest:
     if not start_coordinates or not end_coordinates:
         raise ValidationFailed("Start or end location is missing coordinates.")
 
-    shipments = _build_shipments(context)
-
-
     global_start_time, global_end_time = _resolve_global_time_bounds(
         context,
         incoming_data,
+    )
+
+    shipments, pre_skipped_shipments, excluded_shipments = _build_shipments(
+        context,
+        global_start_time=global_start_time,
+        global_end_time=global_end_time,
     )
 
     route_modifiers = dict(DEFAULT_ROUTE_MODIFIERS)
@@ -110,6 +120,8 @@ def build_request(context: OptimizationContext) -> OptimizationRequest:
         objectives=objectives,
         travel_mode=travel_mode,
         cost_per_kilometer=float(cost_per_kilometer),
+        pre_skipped_shipments=pre_skipped_shipments,
+        excluded_shipments=excluded_shipments,
         populate_transition_polylines=bool(
             incoming_data.get("populate_transition_polylines", True)
         ),
@@ -118,7 +130,12 @@ def build_request(context: OptimizationContext) -> OptimizationRequest:
     )
 
 
-def _build_shipments(context: OptimizationContext) -> List[Shipment]:
+def _build_shipments(
+    context: OptimizationContext,
+    *,
+    global_start_time: Optional[datetime],
+    global_end_time: Optional[datetime],
+) -> tuple[List[Shipment], List[SkippedShipment], List[Shipment]]:
     service_durations = _parse_service_durations(context.incoming_data)
     stop_by_order_id = {
         stop.order_id: stop
@@ -129,39 +146,82 @@ def _build_shipments(context: OptimizationContext) -> List[Shipment]:
         context.route_solution.stops_service_time
     )
     shipments: List[Shipment] = []
+    pre_skipped_shipments: List[SkippedShipment] = []
+    excluded_shipments: List[Shipment] = []
+    grouped_shipments: dict[str, dict[str, Any]] = {}
 
-    for order in context.orders:
+    for order in _ordered_orders_for_shipments(context):
         coords = _coordinates_from_location(order.client_address)
         if not coords:
             raise ValidationFailed(f"Order {order.id} is missing coordinates.")
-       
-        time_windows = _build_time_windows(order, context)
+
         stop = stop_by_order_id.get(order.id)
-        service_duration_seconds = service_durations.get(order.id)
-        if service_duration_seconds is None:
-            effective_service_time = resolve_effective_service_time_payload(
-                getattr(stop, "service_time", None),
-                default_service_time,
+        service_duration_seconds = _resolve_order_service_duration_seconds(
+            order=order,
+            stop=stop,
+            service_durations=service_durations,
+            default_service_time=default_service_time,
+        )
+        location_key = _location_group_key(coords)
+        shipment = grouped_shipments.get(location_key)
+        if shipment is None:
+            shipment = {
+                "label": _shipment_group_label(context.route_solution.id, location_key),
+                "location": coords,
+                "members": [],
+                "time_windows": _build_time_windows(order, context),
+                "service_duration_seconds": 0,
+            }
+            grouped_shipments[location_key] = shipment
+
+        shipment["members"].append(
+            ShipmentMember(
+                order_id=order.id,
+                service_duration_seconds=int(service_duration_seconds or 0),
             )
-            service_duration_seconds = calculate_service_time_seconds(
-                effective_service_time,
-                resolve_order_item_quantity(order),
+        )
+        shipment["service_duration_seconds"] += int(service_duration_seconds or 0)
+
+    for shipment in grouped_shipments.values():
+        members = list(shipment["members"])
+        shipment_time_windows = list(shipment["time_windows"] or [])
+        if len(members) == 1:
+            effective_windows = _intersect_windows_with_global_bounds(
+                shipment_time_windows,
+                global_start_time=global_start_time,
+                global_end_time=global_end_time,
             )
-            if service_duration_seconds is None and stop is not None:
-                service_duration_seconds = parse_duration_seconds(
-                    getattr(stop, "service_duration", None),
+            if shipment_time_windows and not effective_windows:
+                excluded_shipments.append(
+                    Shipment(
+                        label=shipment["label"],
+                        location=shipment["location"],
+                        members=members,
+                        time_windows=shipment_time_windows,
+                        service_duration_seconds=int(shipment["service_duration_seconds"] or 0),
+                    )
                 )
-       
+                pre_skipped_shipments.append(
+                    SkippedShipment(
+                        shipment_label=shipment["label"],
+                        reason=OUTSIDE_OPTIMIZATION_WINDOW,
+                    )
+                )
+                continue
+        else:
+            effective_windows = []
+
         shipments.append(
             Shipment(
-                order_id=order.id,
-                location=coords,
-                time_windows=time_windows,
-                service_duration_seconds=service_duration_seconds,
+                label=shipment["label"],
+                location=shipment["location"],
+                members=members,
+                time_windows=effective_windows,
+                service_duration_seconds=int(shipment["service_duration_seconds"] or 0),
             )
         )
 
-    return shipments
+    return shipments, pre_skipped_shipments, excluded_shipments
 
 
 def _build_time_windows(order, context: OptimizationContext) -> List[TimeWindow]:
@@ -262,10 +322,26 @@ def _build_injected_routes(
 
     eligible_stops.sort(key=lambda stop: stop.stop_order or 0)
 
-    visits = [
-        {"shipment_label": f"{stop.order_id}-{route_solution.id}"}
-        for stop in eligible_stops
-    ]
+    visited_group_labels: set[str] = set()
+    visits: list[dict[str, str]] = []
+    order_lookup = {
+        order.id: order for order in context.orders if getattr(order, "id", None) is not None
+    }
+    for stop in eligible_stops:
+        order = order_lookup.get(stop.order_id)
+        if not order:
+            continue
+        coords = _coordinates_from_location(order.client_address)
+        if not coords:
+            continue
+        group_label = _shipment_group_label(
+            route_solution.id,
+            _location_group_key(coords),
+        )
+        if group_label in visited_group_labels:
+            continue
+        visited_group_labels.add(group_label)
+        visits.append({"shipment_label": group_label})
 
     return [
         {
@@ -363,6 +439,38 @@ def _build_date_range_windows(
     return windows
 
 
+def _intersect_windows_with_global_bounds(
+    windows: List[TimeWindow],
+    *,
+    global_start_time: Optional[datetime],
+    global_end_time: Optional[datetime],
+) -> List[TimeWindow]:
+    if not windows:
+        return []
+    if not global_start_time and not global_end_time:
+        return list(windows)
+
+    intersected: List[TimeWindow] = []
+    for window in windows:
+        start_time = window.start_time
+        end_time = window.end_time
+        if not start_time or not end_time:
+            continue
+
+        effective_start = max(start_time, global_start_time) if global_start_time else start_time
+        effective_end = min(end_time, global_end_time) if global_end_time else end_time
+        if effective_end <= effective_start:
+            continue
+
+        intersected.append(
+            TimeWindow(
+                start_time=effective_start,
+                end_time=effective_end,
+            )
+        )
+    return intersected
+
+
 
 def _coerce_objectives(value: Any) -> List[Dict[str, Any]]:
     if isinstance(value, list) and value:
@@ -386,6 +494,71 @@ def _coordinates_from_location(location: Optional[Dict[str, Any]]) -> Optional[D
         return {"latitude": float(lat), "longitude": float(lng)}
     except (TypeError, ValueError):
         return None
+
+
+def _ordered_orders_for_shipments(context: OptimizationContext) -> list[Any]:
+    order_by_id = {
+        order.id: order for order in context.orders if getattr(order, "id", None) is not None
+    }
+    ordered: list[Any] = []
+    seen_order_ids: set[int] = set()
+
+    route_stops = sorted(
+        [stop for stop in (context.route_solution.stops or []) if getattr(stop, "order_id", None) is not None],
+        key=lambda stop: stop.stop_order if getattr(stop, "stop_order", None) is not None else 0,
+    )
+    for stop in route_stops:
+        order = order_by_id.get(stop.order_id)
+        if not order or order.id in seen_order_ids:
+            continue
+        seen_order_ids.add(order.id)
+        ordered.append(order)
+
+    for order in context.orders:
+        order_id = getattr(order, "id", None)
+        if order_id is None or order_id in seen_order_ids:
+            continue
+        seen_order_ids.add(order_id)
+        ordered.append(order)
+
+    return ordered
+
+
+def _resolve_order_service_duration_seconds(
+    *,
+    order,
+    stop,
+    service_durations: Dict[int, int],
+    default_service_time: dict | None,
+) -> int | None:
+    service_duration_seconds = service_durations.get(order.id)
+    if service_duration_seconds is not None:
+        return service_duration_seconds
+
+    effective_service_time = resolve_effective_service_time_payload(
+        getattr(stop, "service_time", None),
+        default_service_time,
+    )
+    service_duration_seconds = calculate_service_time_seconds(
+        effective_service_time,
+        resolve_order_item_quantity(order),
+    )
+    if service_duration_seconds is None and stop is not None:
+        service_duration_seconds = parse_duration_seconds(
+            getattr(stop, "service_duration", None),
+        )
+    return service_duration_seconds
+
+
+def _location_group_key(location: Dict[str, float]) -> str:
+    return (
+        f"{float(location['latitude']):.6f},"
+        f"{float(location['longitude']):.6f}"
+    )
+
+
+def _shipment_group_label(route_solution_id: int, location_key: str) -> str:
+    return f"group:{route_solution_id}:{location_key}"
 
 
 def _infer_location_from_orders(orders, stops=None, prefer: str = "lowest") -> Dict[str, Any]:
@@ -459,11 +632,17 @@ def _resolve_global_time_bounds(
 ) -> tuple[Optional[datetime], Optional[datetime]]:
     global_start = _coerce_datetime(incoming_data.get("global_start_time"))
     global_end = _coerce_datetime(incoming_data.get("global_end_time"))
+    request_timezone = resolve_request_timezone(
+        context.ctx,
+        context.local_delivery_plan,
+        identity=context.identity,
+    )
 
     if global_start is None:
         global_start = _merge_plan_date_with_route_time(
             context.delivery_plan.start_date,
             context.route_solution.set_start_time,
+            request_timezone=request_timezone,
             use_now_if_today=True,
         )
 
@@ -471,6 +650,7 @@ def _resolve_global_time_bounds(
         global_end = _merge_plan_date_with_route_time(
             context.delivery_plan.end_date,
             context.route_solution.set_end_time,
+            request_timezone=request_timezone,
             use_now_if_today=False,
         )
 
@@ -481,6 +661,7 @@ def _merge_plan_date_with_route_time(
     plan_date_value: Any,
     time_value: Optional[str],
     *,
+    request_timezone,
     use_now_if_today: bool,
 ) -> Optional[datetime]:
     base_date = _coerce_datetime(plan_date_value)
@@ -489,7 +670,11 @@ def _merge_plan_date_with_route_time(
 
     parsed_time = _parse_time_string(time_value)
     if parsed_time:
-        return _combine_date_time(base_date, parsed_time) or base_date
+        return combine_plan_date_and_local_hhmm_to_utc(
+            plan_date=base_date,
+            hhmm=time_value,
+            tz=request_timezone,
+        ) or base_date
 
     if use_now_if_today:
         now = datetime.now(tz=base_date.tzinfo or timezone.utc)

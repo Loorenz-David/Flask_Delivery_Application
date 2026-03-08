@@ -1,4 +1,4 @@
-from sqlalchemy import func, distinct
+from sqlalchemy import func
 from sqlalchemy.orm import Query
 from Delivery_app_BK.models import Order, Item, db
 from ...context import ServiceContext
@@ -13,11 +13,7 @@ def order_stats(query: Query, ctx: ServiceContext):
     # --------------------------------------------------
     # Build DISTINCT order id subquery (safeguard joins)
     # --------------------------------------------------
-    order_ids_subq = (
-        base_query
-        .with_entities(distinct(Order.id).label("id"))
-        .subquery()
-    )
+    order_ids_subq = base_query.with_entities(Order.id.label("id")).distinct().subquery()
 
     # --------------------------------------------------
     # Total orders
